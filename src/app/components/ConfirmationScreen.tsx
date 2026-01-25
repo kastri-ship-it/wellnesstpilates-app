@@ -26,6 +26,7 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
     if (!bookingData.surname.trim()) newErrors.surname = true;
     if (!bookingData.mobile.trim()) newErrors.mobile = true;
     if (!bookingData.email.trim()) newErrors.email = true;
+    if (!bookingData.password || bookingData.password.length < 6) newErrors.password = true;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -47,6 +48,7 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
           surname: bookingData.surname,
           mobile: bookingData.mobile,
           email: bookingData.email,
+          password: bookingData.password,
           date: bookingData.date,
           dateKey: bookingData.dateKey,
           timeSlot: bookingData.timeSlot,
@@ -57,20 +59,68 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
         }),
       });
 
-      const data = await response.json();
+      // Get response text first to handle both JSON and non-JSON responses
+      const responseText = await response.text();
+      console.log('Raw server response:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('Failed to parse response as JSON:', jsonError);
+        console.error('Response was:', responseText);
+        alert('Server error. Please check console logs.');
+        setIsSubmitting(false);
+        return;
+      }
 
       if (!response.ok) {
         console.error('Booking creation error:', data);
-        alert('Failed to create booking. Please try again.');
+        
+        // Check if error is due to wrong password for existing user
+        if (data.errorType === 'WRONG_PASSWORD') {
+          const errorMessage = t.wrongPasswordForExistingUser || 'This email is already registered with a different password. Please enter your correct password to continue with your booking.';
+          alert(errorMessage);
+          // Highlight the password field
+          setErrors({ password: true });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Check if error is due to user already existing (generic)
+        if (data.errorType === 'USER_EXISTS' || (data.error && (data.error.toLowerCase().includes('already exists') || data.error.toLowerCase().includes('already registered')))) {
+          const errorMessage = '✓ Your email is already registered! Please enter your correct password to continue with your booking.';
+          alert(errorMessage);
+          setErrors({ password: true });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        alert(data.error || 'Failed to create booking. Please try again.');
         setIsSubmitting(false);
         return;
       }
 
       console.log('Booking created successfully:', data);
+      
+      // Store session token if provided (auto-login)
+      if (data.session && data.user) {
+        localStorage.setItem('wellnest_session', data.session);
+        localStorage.setItem('wellnest_user', JSON.stringify(data.user));
+        console.log('✅ Session token stored after booking:', data.session);
+      }
+      
+      // Show success message with activation code if available
+      if (data.activationCode) {
+        alert(`Success! Your activation code is: ${data.activationCode}\n\nYou can now login with your email and password.`);
+      } else {
+        alert(data.message || 'Account created! You can now login.');
+      }
+      
       onConfirm();
     } catch (error) {
       console.error('Error creating booking:', error);
-      alert('Failed to create booking. Please try again.');
+      alert(`Failed to create booking: ${error.message}`);
       setIsSubmitting(false);
     }
   };
@@ -127,10 +177,10 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
               <div className="flex justify-between items-center">
                 <p className="text-sm text-[#6b5949]">{t.totalPrice}:</p>
                 <p className="text-base text-[#3d2f28]">
-                  {bookingData.selectedPackage === 'package8' 
-                    ? '3500 DEN' 
-                    : bookingData.selectedPackage === 'package10' 
-                    ? '4200 DEN' 
+                  {bookingData.selectedPackage === 'package4' 
+                    ? '1800 DEN' 
+                    : bookingData.selectedPackage === 'package8' 
+                    ? '3400 DEN' 
                     : '4800 DEN'}
                 </p>
               </div>
@@ -184,6 +234,20 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
               errors.email ? 'ring-2 ring-red-500' : ''
             }`}
           />
+        </div>
+        <div>
+          <input
+            type="password"
+            placeholder={`${t.password}* (min 6)`}
+            value={bookingData.password || ''}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            className={`w-full px-3 py-2 rounded-lg bg-[#f5f0ed] text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949] ${
+              errors.password ? 'ring-2 ring-red-500' : ''
+            }`}
+          />
+          {errors.password && (
+            <p className="text-xs text-red-500 mt-1">{t.password} (min 6 characters)</p>
+          )}
         </div>
       </div>
 

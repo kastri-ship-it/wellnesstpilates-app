@@ -155,7 +155,7 @@ export function DuoTraining({ onBack, language, onLogoClick }: DuoTrainingProps)
             </div>
             <h2 className="text-xl font-semibold text-[#3d2f28] mb-2 tracking-tight">{t.bookingConfirmed || 'Booking Confirmed!'}</h2>
             <p className="text-sm text-[#6b5949] mb-5 leading-relaxed">
-              {t.checkEmailForCode || 'Please check your email for the activation code.'}
+              {t.bookingConfirmedDesc || 'Your booking has been successfully registered. You can log in to your account to manage your bookings.'}
             </p>
             <button
               onClick={() => setShowSuccessPopup(false)}

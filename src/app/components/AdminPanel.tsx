@@ -13,14 +13,14 @@ export type User = {
   mobile: string;
   email: string;
   status: UserStatus;
-  packageType?: 'package8' | 'package10' | 'package12' | 'single';
+  packageType?: 'package4' | 'package8' | 'package12' | 'single';
   bookingDate?: string;
   bookingTime?: string;
   totalSessions?: number; // Total sessions purchased across all packages
   usedSessions?: number; // Sessions used
   remainingSessions?: number; // Sessions remaining
   packages?: Array<{ // Track all packages purchased
-    type: 'package8' | 'package10' | 'package12';
+    type: 'package4' | 'package8' | 'package12';
     sessions: number;
     purchasedDate: string;
     activatedDate?: string;
@@ -39,7 +39,7 @@ export type Booking = {
   dateKey: string;
   timeSlot: string;
   instructor: string;
-  selectedPackage?: 'package8' | 'package10' | 'package12';
+  selectedPackage?: 'package4' | 'package8' | 'package12';
   payInStudio: boolean;
   language: string;
   status: UserStatus;
@@ -600,10 +600,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                                 <div>
                                   <p className="text-sm text-[#3d2f28] font-medium">{booking.name} {booking.surname}</p>
                                   <p className="text-xs text-[#8b7764] mt-0.5">
-                                    {booking.selectedPackage === 'package8'
+                                    {booking.selectedPackage === 'package4'
+                                      ? '4 Sessions Package'
+                                      : booking.selectedPackage === 'package8'
                                       ? '8 Sessions Package'
-                                      : booking.selectedPackage === 'package10'
-                                      ? '10 Sessions Package'
                                       : booking.selectedPackage === 'package12'
                                       ? '12 Sessions Package'
                                       : 'Single Session'}
@@ -677,7 +677,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                   .filter(user => user.status === userSubTab)
                   .map((user) => {
                     const isExpanded = expandedUserId === user.id;
-                    const sessionCount = user.packageType === 'package8' ? 8 : user.packageType === 'package10' ? 10 : user.packageType === 'package12' ? 12 : 1;
+                    const sessionCount = user.packageType === 'package4' ? 4 : user.packageType === 'package8' ? 8 : user.packageType === 'package12' ? 12 : 1;
                     const usedSessions = user.usedSessions || 0;
                     const remainingSessions = sessionCount - usedSessions;
 
@@ -734,10 +734,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                               </div>
 
                               <div className="text-sm text-[#3d2f28] font-medium">
-                                {user.packageType === 'package8' && '8 Sessions (3500 DEN)'}
-                                {user.packageType === 'package10' && '10 Sessions (4200 DEN)'}
+                                {user.packageType === 'package4' && '4 Sessions (1800 DEN)'}
+                                {user.packageType === 'package8' && '8 Sessions (3400 DEN)'}
                                 {user.packageType === 'package12' && '12 Sessions (4800 DEN)'}
-                                {user.packageType === 'single' && 'Single (600 DEN)'}
+                                {user.packageType === 'single' && 'Single (500 DEN)'}
                               </div>
                             </div>
 
@@ -889,27 +889,30 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                 
                 {/* Show only the booked package */}
                 {selectedUser.packageType === 'package8' && (
-                  <div className="w-full p-3 rounded-lg border-2 border-[#6b5949] bg-[#f5f0ed] text-left">
+                  <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm text-[#3d2f28] font-medium">8 Sessions</p>
                         <p className="text-xs text-[#8b7764]">Code: PILATES8</p>
                       </div>
-                      <p className="text-sm text-[#3d2f28]">3500 DEN</p>
+                      <div className="text-right">
+                        <p className="text-sm text-[#3d2f28]">3400 DEN</p>
+                        <p className="text-xs text-[#9ca571] font-medium">Recommended</p>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {selectedUser.packageType === 'package10' && (
+                {selectedUser.packageType === 'package4' && (
                   <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">10 Sessions</p>
+                        <p className="text-sm text-[#3d2f28] font-medium">4 Sessions</p>
                         <p className="text-xs text-[#8b7764]">Code: WELLNEST2025</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-[#3d2f28]">4200 DEN</p>
-                        <p className="text-xs text-[#9ca571] font-medium">Recommended</p>
+                        <p className="text-sm text-[#3d2f28]">1800 DEN</p>
+                        <p className="text-xs text-[#9ca571] font-medium">Starter</p>
                       </div>
                     </div>
                   </div>

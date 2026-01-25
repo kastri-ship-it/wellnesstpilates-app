@@ -105,6 +105,7 @@ export const translations = {
     loginTab: 'Kyçja',
     registerTab: 'Regjistrimi',
     password: 'Fjalëkalimi',
+    passwordPlaceholder: 'Vendos fjalëkalimin',
     confirmPassword: 'Konfirmo fjalëkalimin',
     alreadyHaveAccount: 'Keni një llogari?',
     loginHere: 'Kyçuni këtu',
@@ -120,6 +121,8 @@ export const translations = {
     activationError: 'Kodi i aktivizimit nuk është i saktë. Ju lutem provoni përsëri.',
     loginSuccess: 'Kyçja u krye me sukses!',
     registerSuccess: 'Regjistrimi u krye me sukses! Tani mund të kyçeni.',
+    userExistsLoginInstead: 'Një llogari me këtë email tashmë ekziston. Ju lutem kyçuni në vend të kësaj.',
+    wrongPasswordForExistingUser: 'Ky email është tashmë i regjistruar me një fjalëkalim tjetër. Ju lutem vendosni fjalëkalimin tuaj të saktë për të vazhduar me rezervimin.',
     
     // Date formatting
     mondayDate: 'E hënë, 13 Janar',
@@ -155,7 +158,7 @@ export const translations = {
     benefit3: 'Çmimet më të mira për sezon',
     hideDetails: 'Fshih detajet',
     bookingConfirmed: 'Rezervimi u konfirmua!',
-    checkEmailForCode: 'Ju lutem kontrolloni email-in tuaj për kodin e aktivizimit.',
+    bookingConfirmedDesc: 'Rezervimi juaj u regjistrua me sukses. Mund të kyçeni në llogarinë tuaj për të menaxhuar rezervimet.',
     processing: 'Duke procesuar...',
     
     // Individual Training
@@ -239,6 +242,35 @@ export const translations = {
     overview: 'Përmbledhje',
     bookings: 'Rezervime',
     profile: 'Profili',
+    
+    // Package flow - 2-step
+    selectFirstSession: 'Zgjidhni klasën e parë',
+    selectDateTimeForFirst: 'Zgjidhni datën dhe orën për klasën tuaj të parë',
+    bookingInProgress: 'Duke rezervuar klasën e parë...',
+    firstSession: 'Klasa e parë',
+    slotAvailable: 'i lirë',
+    slotFull: 'Mbushur',
+    loading: 'Duke ngarkuar...',
+    packageCreated: 'Paketa u krijua me sukses!',
+    packageCreatedDesc: 'Paketa juaj u regjistrua. A dëshironi të rezervoni klasën e parë tani?',
+    bookFirstSessionNow: 'REZERVO KLASËN E PARË',
+    skipForNow: 'Më vonë',
+    packageCreatedSuccess: 'Paketa juaj është gati!',
+    noSlotsAvailable: 'Nuk ka kohë të lira',
+    tryAgainLater: 'Ju lutem provoni më vonë ose na kontaktoni.',
+    
+    // User Dashboard
+    myPackages: 'Paketat e mia',
+    loggedInAs: 'I kyqur si',
+    noPackagesYet: 'Ende nuk keni paketa të rezervuara',
+    paid: 'Paguar',
+    needsPayment: 'Kërkon pagesë',
+    reschedule: 'Ndryshoni datën',
+    noFirstSessionBooked: 'Klasa e parë ende nuk është rezervuar',
+    rescheduleSession: 'Ndryshoni datën e klasës',
+    currentSession: 'Klasa aktuale',
+    selectNewDateTime: 'Zgjidhni datën dhe orën e re',
+    spotsLeft: 'vende',
   },
   
   MK: {
@@ -317,7 +349,7 @@ export const translations = {
     successMessage: 'Вашата резервација е успешно регистрирана. Наскоро ќе добиете потврден емаил.',
     nextSteps: 'След��и чекори',
     step1: 'Ќе добиете потврден емаил на вашата адреса',
-    step2: 'Пристигнете 10 минути пред почетокот на сесијата',
+    step2: 'Пристигнете 10 минути пред поч��токот на сесијата',
     step3: 'Понесете пешкир и вода (можете да купите и во студио)',
     viewOther: 'ПОГЛЕДНИ ДРУГИ ТЕРМИНИ',
     viewPackages: 'ПОГЛЕДНИ ПАКЕТИ',
@@ -344,7 +376,8 @@ export const translations = {
     register: 'Регистрација',
     loginTab: 'Најава',
     registerTab: 'Регистрација',
-    password: 'Лозина',
+    password: 'Лозинка',
+    passwordPlaceholder: 'Внесете лозинка',
     confirmPassword: 'Потврди лозинка',
     alreadyHaveAccount: 'Имате сметка?',
     loginHere: 'Најавете се овде',
@@ -360,6 +393,8 @@ export const translations = {
     activationError: 'Активациониот код не е точен. Ве молиме обидете се повторно.',
     loginSuccess: 'Најавата е успешна!',
     registerSuccess: 'Регистрацијата е успешна! Сега можете да се најавите.',
+    userExistsLoginInstead: 'Веќе постои сметка со оваа емаил адреса. Ве молиме најавете се наместо тоа.',
+    wrongPasswordForExistingUser: 'Оваа емаил адреса е веќе регистрирана со друга лозинка. Ве молиме внесете ја вашата точна лозинка за да продолжите со резервацијата.',
     
     // Date formatting
     mondayDate: 'Понеделник, 13 Јануари',
@@ -395,7 +430,7 @@ export const translations = {
     benefit3: 'Најдобри цени за сезон',
     hideDetails: 'Сокриј детали',
     bookingConfirmed: 'Резервацијата е потврдена!',
-    checkEmailForCode: 'Молиме проверете го вашиот емаил за активационен код.',
+    bookingConfirmedDesc: 'Вашата резервација е успешно регистрирана. Можете да се најавите на вашата сметка за да управувате со резервациите.',
     processing: 'Обработка...',
     
     // Individual Training
@@ -418,7 +453,7 @@ export const translations = {
     // DUO Training
     whatIsDuo: 'Што е DUO тренинг?',
     duoBenefit1: 'Тренирајте со пријател или партнер',
-    duoBenefit2: 'Програма прилагодена за две лица',
+    duoBenefit2: 'Програма прилагодена за ��ве лица',
     duoBenefit3: 'Флексибилен распоред што ви одговара',
     duoBenefit4: 'Мотивирајте се меѓусебно за подобри резултати',
     
@@ -477,8 +512,37 @@ export const translations = {
     currentPackage: 'Те��овен пакет',
     noPackage: 'Не��а активен пакет',
     overview: 'Преглед',
-    bookings: 'Резервации',
+    bookings: 'Ре��ервации',
     profile: 'Профил',
+    
+    // Package flow - 2-step
+    selectFirstSession: 'Избери прва сесија',
+    selectDateTimeForFirst: 'Изберете датум и време за вашата прва сесија',
+    bookingInProgress: 'Резервирање на првата сесија...',
+    firstSession: 'Прва сесија',
+    slotAvailable: 'слободни',
+    slotFull: 'Полн',
+    loading: 'Се вчитува...',
+    packageCreated: 'Пакетот е успешно креиран!',
+    packageCreatedDesc: 'Вашиот пакет е регистриран. Дали сакате да резервирате прва класа сега?',
+    bookFirstSessionNow: 'РЕЗЕРВИРАЈ ПРВА КЛАСА',
+    skipForNow: 'Подоцна',
+    packageCreatedSuccess: 'Вашиот пакет е подготвен!',
+    noSlotsAvailable: 'Нема слободни термини',
+    tryAgainLater: 'Ве молиме обидете се подоцна или контактирајте не.',
+    
+    // User Dashboard
+    myPackages: 'Мои пакети',
+    loggedInAs: 'Најавени сте како',
+    noPackagesYet: 'Сè уште немате резервирани пакети',
+    paid: 'Платено',
+    needsPayment: 'Потребна е уплата',
+    reschedule: 'Промени термин',
+    noFirstSessionBooked: 'Првата класа сè уште не е резервирана',
+    rescheduleSession: 'Промени термин на класата',
+    currentSession: 'Тековна класа',
+    selectNewDateTime: 'Изберете нов датум и време',
+    spotsLeft: 'места',
   },
   
   EN: {
@@ -585,6 +649,7 @@ export const translations = {
     loginTab: 'Login',
     registerTab: 'Register',
     password: 'Password',
+    passwordPlaceholder: 'Enter your password',
     confirmPassword: 'Confirm Password',
     alreadyHaveAccount: 'Have an account?',
     loginHere: 'Login here',
@@ -600,6 +665,8 @@ export const translations = {
     activationError: 'Activation code is not correct. Please try again.',
     loginSuccess: 'Login successful!',
     registerSuccess: 'Registration successful! You can now login.',
+    userExistsLoginInstead: 'An account with this email already exists. Please login instead.',
+    wrongPasswordForExistingUser: 'This email is already registered with a different password. Please enter your correct password to continue with your booking.',
     
     // Date formatting
     mondayDate: 'Monday, January 13',
@@ -635,7 +702,7 @@ export const translations = {
     benefit3: 'Best prices for the season',
     hideDetails: 'Hide Details',
     bookingConfirmed: 'Booking Confirmed!',
-    checkEmailForCode: 'Please check your email for the activation code.',
+    bookingConfirmedDesc: 'Your booking has been successfully registered. You can log in to your account to manage your bookings.',
     processing: 'Processing...',
     
     // Individual Training
@@ -719,5 +786,34 @@ export const translations = {
     overview: 'Overview',
     bookings: 'Bookings',
     profile: 'Profile',
+    
+    // Package flow - 2-step
+    selectFirstSession: 'Select First Session',
+    selectDateTimeForFirst: 'Choose date and time for your first class',
+    bookingInProgress: 'Booking first session...',
+    firstSession: 'First Session',
+    slotAvailable: 'free',
+    slotFull: 'Full',
+    loading: 'Loading...',
+    packageCreated: 'Package Created Successfully!',
+    packageCreatedDesc: 'Your package has been registered. Would you like to book your first session now?',
+    bookFirstSessionNow: 'BOOK FIRST SESSION',
+    skipForNow: 'Skip for Now',
+    packageCreatedSuccess: 'Your package is ready!',
+    noSlotsAvailable: 'No slots available',
+    tryAgainLater: 'Please try again later or contact us.',
+    
+    // User Dashboard
+    myPackages: 'My Packages',
+    loggedInAs: 'Logged in as',
+    noPackagesYet: 'No packages booked yet',
+    paid: 'Paid',
+    needsPayment: 'Needs Payment',
+    reschedule: 'Reschedule',
+    noFirstSessionBooked: 'First session not booked yet',
+    rescheduleSession: 'Reschedule Session',
+    currentSession: 'Current Session',
+    selectNewDateTime: 'Select New Date & Time',
+    spotsLeft: 'spots',
   },
 };

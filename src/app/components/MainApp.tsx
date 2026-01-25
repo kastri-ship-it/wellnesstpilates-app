@@ -15,6 +15,8 @@ import { LoginRegisterModal } from './LoginRegisterModal';
 import { UserDashboard } from './UserDashboard';
 import { AdminLogin } from './AdminLogin';
 import { AdminPanel } from './AdminPanel';
+import { PasswordSetupPage } from './PasswordSetupPage';
+import { LoginPage } from './LoginPage';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 type Screen =
@@ -40,6 +42,35 @@ export function MainApp() {
   const [hasCleared, setHasCleared] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [logoClickTimer, setLogoClickTimer] = useState<NodeJS.Timeout | null>(null);
+  const [currentRoute, setCurrentRoute] = useState<string>('');
+  const [userSession, setUserSession] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Handle hash-based routing for authentication pages
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      setCurrentRoute(hash);
+    };
+
+    // Initial check
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const session = localStorage.getItem('wellnest_session');
+    const user = localStorage.getItem('wellnest_user');
+    
+    if (session && user) {
+      setUserSession(session);
+      setCurrentUser(JSON.parse(user));
+    }
+  }, []);
 
   // Scroll to top on every screen change
   useEffect(() => {
@@ -64,15 +95,32 @@ export function MainApp() {
           }
         );
 
-        const data = await response.json();
-        if (response.ok) {
-          console.log('✅ Data cleared successfully:', data);
-          setHasCleared(true);
-        } else {
-          console.error('❌ Failed to clear data:', data);
+        // Get response text first
+        const responseText = await response.text();
+        
+        // Check if response is ok
+        if (!response.ok) {
+          console.error('❌ Failed to clear data:', response.status, responseText);
+          setHasCleared(true); // Prevent infinite retry
+          return;
         }
+
+        // Try to parse JSON
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          console.error('❌ JSON parse error:', parseError);
+          console.log('Response text was:', responseText);
+          setHasCleared(true); // Prevent infinite retry
+          return;
+        }
+
+        console.log('✅ Data cleared successfully:', data);
+        setHasCleared(true);
       } catch (error) {
         console.error('Error clearing data:', error);
+        setHasCleared(true); // Prevent infinite retry
       }
     };
 
@@ -96,7 +144,27 @@ export function MainApp() {
   };
 
   const handleConfirmBooking = (bookingData: any) => {
-    setScreen({ type: 'success', bookingData });
+    // Check if user was auto-logged in (session token in localStorage)
+    const session = localStorage.getItem('wellnest_session');
+    const userStr = localStorage.getItem('wellnest_user');
+    
+    if (session && userStr) {
+      // User was auto-logged in, go to dashboard
+      const user = JSON.parse(userStr);
+      setUserSession(session);
+      setCurrentUser(user);
+      console.log('✅ User auto-logged in after booking, redirecting to dashboard');
+      
+      setScreen({
+        type: 'userDashboard',
+        userEmail: user.email,
+        userName: user.name,
+        userSurname: user.surname
+      });
+    } else {
+      // No session, show success screen
+      setScreen({ type: 'success', bookingData });
+    }
   };
 
   const handleInstructorClick = (instructorName: string) => {
@@ -116,7 +184,21 @@ export function MainApp() {
   };
 
   const handleLoginSuccess = (user: any, needsActivation: boolean) => {
+    console.log('🎯 handleLoginSuccess called for user:', user.email);
     setShowLoginRegister(false);
+    
+    // Store session and user data
+    const session = localStorage.getItem('wellnest_session');
+    console.log('📦 Session from localStorage:', session ? '✅ Found' : '❌ Not found');
+    
+    if (session) {
+      setUserSession(session);
+      setCurrentUser(user);
+      console.log('✅ User session and current user set');
+    } else {
+      console.error('❌ No session found in localStorage!');
+    }
+    
     setScreen({
       type: 'userDashboard',
       userEmail: user.email,
@@ -132,14 +214,14 @@ export function MainApp() {
   };
 
   const cycleLanguage = () => {
-    const languages: Language[] = ['sq', 'mk', 'en'];
+    const languages: Language[] = ['SQ', 'MK', 'EN'];
     const currentIndex = languages.indexOf(language);
     const nextIndex = (currentIndex + 1) % languages.length;
     setLanguage(languages[nextIndex]);
   };
 
   const getLanguageLabel = () => {
-    const labels = { sq: 'SQ', mk: 'МК', en: 'EN' };
+    const labels = { SQ: 'SQ', MK: 'МК', EN: 'EN' };
     return labels[language];
   };
 
@@ -159,6 +241,53 @@ export function MainApp() {
 
     setLogoClickTimer(newTimer);
   };
+
+  // Render auth pages first (full screen, no container)
+  if (currentRoute.includes('#/setup-password') || currentRoute === '#/login') {
+    return (
+      <>
+        {currentRoute.includes('#/setup-password') && (
+          <PasswordSetupPage
+            onComplete={(session, user) => {
+              setUserSession(session);
+              setCurrentUser(user);
+              window.location.hash = '';
+              setScreen({
+                type: 'userDashboard',
+                userEmail: user.email,
+                userName: user.name,
+                userSurname: user.surname,
+                userPackage: null,
+                sessionsRemaining: 0
+              });
+            }}
+          />
+        )}
+
+        {currentRoute === '#/login' && !currentRoute.includes('setup-password') && (
+          <LoginPage
+            onLogin={(session, user) => {
+              setUserSession(session);
+              setCurrentUser(user);
+              window.location.hash = '';
+              setScreen({
+                type: 'userDashboard',
+                userEmail: user.email,
+                userName: user.name,
+                userSurname: user.surname,
+                userPackage: null,
+                sessionsRemaining: 0
+              });
+            }}
+            onBack={() => {
+              window.location.hash = '';
+              setScreen({ type: 'trainingType' });
+            }}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="relative w-full max-w-[440px] h-[956px] mx-auto bg-[#f5f0ed] overflow-hidden shadow-2xl">
@@ -212,6 +341,18 @@ export function MainApp() {
           bookingData={screen.bookingData}
           onBack={handleBack}
           onConfirm={handleConfirmBooking}
+          onPaymentToggle={(value) => {
+            setScreen({
+              type: 'confirmation',
+              bookingData: { ...screen.bookingData, payInStudio: value }
+            });
+          }}
+          onUpdateBookingData={(data) => {
+            setScreen({
+              type: 'confirmation',
+              bookingData: { ...screen.bookingData, ...data }
+            });
+          }}
           language={language}
         />
       )}
@@ -230,10 +371,14 @@ export function MainApp() {
 
       {screen.type === 'userDashboard' && (
         <UserDashboard
+          sessionToken={userSession || localStorage.getItem('wellnest_session') || ''}
           userEmail={screen.userEmail}
-          onLogout={handleBack}
-          onBookSession={() => {
-            // Navigate back to training type selection to book a new session
+          onBack={() => {
+            // Logout and go back to home
+            localStorage.removeItem('wellnest_session');
+            localStorage.removeItem('wellnest_user');
+            setUserSession(null);
+            setCurrentUser(null);
             setScreen({ type: 'trainingType' });
           }}
           language={language}

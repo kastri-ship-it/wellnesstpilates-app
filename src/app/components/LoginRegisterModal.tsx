@@ -14,7 +14,7 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
   const t = translations[language];
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
-  const [activationCode, setActivationCode] = useState('');
+  const [password, setPassword] = useState('');
   const [confirmPasswordValue, setConfirmPasswordValue] = useState('');
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
@@ -23,7 +23,7 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    if (!email.trim() || !activationCode.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError(t.memberActivation?.error || 'Please fill in all fields');
       return;
     }
@@ -40,11 +40,24 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${publicAnonKey}`,
           },
-          body: JSON.stringify({ email: email.trim(), password: activationCode }),
+          body: JSON.stringify({ email: email.trim(), password: password }),
         }
       );
 
-      const data = await response.json();
+      // Get response text first to handle both JSON and non-JSON responses
+      const responseText = await response.text();
+      console.log('Raw login response:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('Failed to parse login response as JSON:', jsonError);
+        console.error('Response was:', responseText);
+        setError('Server error. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
 
       if (!response.ok) {
         console.error('Login error:', data);
@@ -54,6 +67,13 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
       }
 
       console.log('Login successful:', data);
+      
+      // Store session token in localStorage
+      if (data.session) {
+        localStorage.setItem('wellnest_session', data.session);
+        localStorage.setItem('wellnest_user', JSON.stringify(data.user));
+        console.log('✅ Session token stored:', data.session);
+      }
       
       // Pass the full user data to parent
       onLoginSuccess(data.user, false);
@@ -65,12 +85,12 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
   };
 
   const handleRegister = async () => {
-    if (!email.trim() || !activationCode.trim() || !confirmPasswordValue.trim() || !name.trim() || !surname.trim() || !mobile.trim()) {
+    if (!email.trim() || !password.trim() || !confirmPasswordValue.trim() || !name.trim() || !surname.trim() || !mobile.trim()) {
       setError(t.memberActivation?.error || 'Please fill in all fields');
       return;
     }
     
-    if (activationCode !== confirmPasswordValue) {
+    if (password !== confirmPasswordValue) {
       setError('Passwords do not match');
       return;
     }
@@ -89,7 +109,7 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
           },
           body: JSON.stringify({
             email: email.trim(),
-            password: activationCode,
+            password: password,
             name: name.trim(),
             surname: surname.trim(),
             mobile: mobile.trim(),
@@ -97,10 +117,35 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
         }
       );
 
-      const data = await response.json();
+      // Get response text first to handle both JSON and non-JSON responses
+      const responseText = await response.text();
+      console.log('Raw registration response:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('Failed to parse response as JSON:', jsonError);
+        console.error('Response was:', responseText);
+        setError('Server error. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
 
       if (!response.ok) {
         console.error('Register error:', data);
+        
+        // If user already exists, switch to login mode and show a helpful message
+        if (data.errorType === 'USER_EXISTS' || (data.error && data.error.toLowerCase().includes('already exists'))) {
+          setMode('login');
+          setPassword('');
+          setConfirmPasswordValue('');
+          // Keep the email filled in to make login easier
+          setError('✓ This email is already registered. Please login with your password below.');
+          setIsSubmitting(false);
+          return;
+        }
+        
         setError(data.error || 'Registration failed');
         setIsSubmitting(false);
         return;
@@ -110,7 +155,7 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
       
       // After successful registration, show login screen
       setMode('login');
-      setActivationCode('');
+      setPassword('');
       setConfirmPasswordValue('');
       setError('');
       setIsSubmitting(false);
@@ -210,17 +255,16 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
 
                 <div>
                   <label className="block text-sm text-[#3d2f28] mb-1">
-                    {t.activationCode}
+                    {t.password}
                   </label>
                   <input
-                    type="text"
-                    value={activationCode}
-                    onChange={(e) => setActivationCode(e.target.value.toUpperCase())}
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder={t.activationCodePlaceholder}
-                    className="w-full px-3 py-2 rounded-lg bg-white text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949] font-mono"
+                    placeholder={t.passwordPlaceholder || 'Enter your password'}
+                    className="w-full px-3 py-2 rounded-lg bg-white text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949]"
                     disabled={isSubmitting}
-                    maxLength={14}
                   />
                 </div>
 
@@ -332,10 +376,10 @@ export function LoginRegisterModal({ onClose, onLoginSuccess, language }: LoginR
                   </label>
                   <input
                     type="password"
-                    value={activationCode}
-                    onChange={(e) => setActivationCode(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder={t.password}
+                    placeholder={t.passwordPlaceholder || 'Enter your password'}
                     className="w-full px-3 py-2 rounded-lg bg-white text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949]"
                     disabled={isSubmitting}
                   />
