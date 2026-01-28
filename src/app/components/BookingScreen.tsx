@@ -43,16 +43,20 @@ const getDayName = (dayOfWeek: number, language: Language): string => {
   return days[dayOfWeek]; // 0 = Monday, 1 = Tuesday, etc.
 };
 
-// Helper function to generate all weekday dates until end of February
+// Helper function to generate the next 2 weekdays starting from January 29th
 const generateWeekdayDates = (language: Language) => {
   const t = translations[language];
   const dates = [];
-  const startDate = new Date(2026, 0, 23); // Start from January 23, 2026
-  const endDate = new Date(2026, 1, 28); // End at February 28, 2026
   
-  let currentDate = new Date(startDate);
+  // Start from January 29, 2026
+  let currentDate = new Date(2026, 0, 29); // Month is 0-indexed (0 = January)
+  currentDate.setHours(0, 0, 0, 0);
   
-  while (currentDate <= endDate) {
+  let weekdaysFound = 0;
+  const maxDaysToCheck = 10; // Check up to 10 days ahead to find 2 weekdays
+  let daysChecked = 0;
+  
+  while (weekdaysFound < 2 && daysChecked < maxDaysToCheck) {
     const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
     
     // Only include weekdays (Monday to Friday)
@@ -67,10 +71,13 @@ const generateWeekdayDates = (language: Language) => {
         key: `${month + 1}-${day}`, // Format: "1-22", "2-3", etc.
         fullDate: new Date(currentDate),
       });
+      
+      weekdaysFound++;
     }
     
     // Move to next day
     currentDate.setDate(currentDate.getDate() + 1);
+    daysChecked++;
   }
   
   return dates;
@@ -163,7 +170,7 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
   const mockBookings = calculateBookingsPerSlot();
   
   // Standard time slots for all days (matching admin panel)
-  const standardTimeSlots = ['08:00', '09:00', '10:00', '11:00', '16:00', '17:00', '18:00'];
+  const standardTimeSlots = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
   
   // Function to calculate end time (50 minutes later)
   const getEndTime = (startTime: string): string => {
@@ -180,7 +187,15 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
     const selectedDate = tabs[dayIndex].fullDate;
     const dayBookings = mockBookings[selectedDateKey] || {};
     
-    return standardTimeSlots.map(time => {
+    // Filter out 09:00 time slot for January 29th
+    const timeSlotsForThisDay = standardTimeSlots.filter(time => {
+      if (selectedDateKey === '1-29' && time === '09:00') {
+        return false; // Remove 09:00 on January 29th
+      }
+      return true;
+    });
+    
+    return timeSlotsForThisDay.map(time => {
       const bookedCount = dayBookings[time] || 0;
       const availableSpots = 4 - bookedCount;
       
@@ -258,21 +273,23 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
         </div>
       </div> */}
 
-      {/* Navigation Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto">
+      {/* Navigation Tabs - 2 Large Date Buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
         {tabs.map((tab, index) => (
           <button
             key={index}
             onClick={() => setSelectedTab(index)}
-            className={`flex-shrink-0 px-4 py-2.5 rounded-lg text-xs transition-colors ${
+            className={`px-4 py-5 rounded-xl text-center transition-all border-2 ${
               selectedTab === index
-                ? 'bg-[#d4c4ba] text-[#3d2f28]'
-                : 'bg-white text-[#6b5949]'
+                ? 'bg-gradient-to-br from-[#9ca571] to-[#8a9463] text-white border-[#9ca571] shadow-lg'
+                : 'bg-white text-[#3d2f28] border-[#e8e6e3] hover:border-[#9ca571] hover:shadow-md'
             }`}
           >
-            <div className="text-center">
-              <div className="font-medium">{tab.day}</div>
-              <div className="text-[11px] mt-1 opacity-70">{tab.date}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide opacity-80 mb-1">
+              {tab.day}
+            </div>
+            <div className="text-base font-bold">
+              {tab.date}
             </div>
           </button>
         ))}
@@ -330,7 +347,7 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
                   ? t.timePassed || 'Kaluar'
                   : slot.status === 'full' 
                   ? t.noSpots
-                  : `${slot.availableSpots} ${slot.availableSpots === 1 ? t.spot : t.spots} ${slot.availableSpots === 1 ? t.availableSingular : t.available}`}
+                  : t.bookNow}
               </button>
             </div>
           );

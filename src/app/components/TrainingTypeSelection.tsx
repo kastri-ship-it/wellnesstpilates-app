@@ -125,13 +125,13 @@ export function TrainingTypeSelection({
             
             {/* Content */}
             <div className="relative h-full flex items-center justify-between px-5">
-              <div className="text-left">
+              <div className="text-left flex-1 pr-4">
                 <h2 className="text-lg text-white mb-1">{option.title}</h2>
-                <p className="text-xs text-white/90 max-w-[200px]">{option.subtitle}</p>
+                <p className="text-xs text-white/90 whitespace-pre-line leading-relaxed">{option.subtitle}</p>
               </div>
               
               {/* Arrow */}
-              <div className="bg-white/20 backdrop-blur-sm rounded-full p-2 group-hover:bg-white/30 transition-colors">
+              <div className="bg-white/20 backdrop-blur-sm rounded-full p-2 group-hover:bg-white/30 transition-colors flex-shrink-0">
                 <ChevronRight className="w-5 h-5 text-white" />
               </div>
             </div>

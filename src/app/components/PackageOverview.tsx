@@ -38,7 +38,7 @@ type TimeSlot = {
 
 export function PackageOverview({ onBack, language }: PackageOverviewProps) {
   const t = translations[language];
-  const [expandedPackage, setExpandedPackage] = useState<'package4' | 'package8' | 'package12' | null>(null);
+  const [expandedPackage, setExpandedPackage] = useState<'package8' | 'package10' | 'package12' | null>(null);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,32 +61,32 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
 
   const packages = [
     {
-      type: 'package4' as const,
-      sessions: 4,
-      label: '4 KLASA',
-      savings: 200,
-      price: 1800,
+      type: 'package8' as const,
+      sessions: 8,
+      label: t.package8Sessions || '8 CLASSES',
+      savings: 500,
+      price: 3500,
       isRecommended: false,
     },
     {
-      type: 'package8' as const,
-      sessions: 8,
-      label: '8 KLASA',
-      savings: 600,
-      price: 3400,
+      type: 'package10' as const,
+      sessions: 10,
+      label: t.package10Sessions || '10 CLASSES',
+      savings: 800,
+      price: 4200,
       isRecommended: true,
     },
     {
       type: 'package12' as const,
       sessions: 12,
-      label: '12 KLASA',
+      label: t.package12Sessions || '12 CLASSES',
       savings: 1200,
       price: 4800,
       isRecommended: false,
     },
   ];
 
-  const handlePackageClick = (packageType: 'package4' | 'package8' | 'package12') => {
+  const handlePackageClick = (packageType: 'package8' | 'package10' | 'package12') => {
     if (expandedPackage === packageType) {
       setExpandedPackage(null);
     } else {
@@ -95,7 +95,7 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
   };
 
   // Step 1: Create package
-  const handleSubmit = async (packageType: 'package4' | 'package8' | 'package12') => {
+  const handleSubmit = async (packageType: 'package8' | 'package10' | 'package12') => {
     if (!formData.name || !formData.surname || !formData.mobile || !formData.email) {
       alert('Please fill in all required fields');
       return;
@@ -171,21 +171,21 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       const data = await response.json();
       const existingBookings = data.bookings || [];
 
-      // Generate next 14 weekdays only, starting from tomorrow
+      // Generate next 2 weekdays only, starting from January 29, 2026
       const slots: DateSlot[] = [];
       const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startDate = new Date(2026, 0, 29); // January 29, 2026 (month is 0-indexed)
 
-      const timeSlots = ['08:00', '09:00', '10:00', '11:00', '16:00', '17:00', '18:00'];
+      const timeSlots = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
       
       let daysAdded = 0;
       let daysChecked = 0;
-      const maxDaysToCheck = 30; // Check up to 30 days ahead to find 14 weekdays
+      const maxDaysToCheck = 10; // Check up to 10 days ahead to find 2 weekdays
       
-      while (daysAdded < 14 && daysChecked < maxDaysToCheck) {
+      while (daysAdded < 2 && daysChecked < maxDaysToCheck) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + daysChecked);
         daysChecked++;
-        const date = new Date(today);
-        date.setDate(today.getDate() + daysChecked);
         
         // Skip weekends (Saturday = 6, Sunday = 0)
         const dayOfWeek = date.getDay();
@@ -199,7 +199,15 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
           (b.reservationStatus === 'confirmed' || b.reservationStatus === 'attended' || b.reservationStatus === 'pending')
         );
         
-        const availableTimeSlots = timeSlots.map(time => {
+        // Filter out 09:00 time slot for January 29th
+        const timeSlotsForThisDay = timeSlots.filter(time => {
+          if (dateKey === '1-29' && time === '09:00') {
+            return false; // Remove 09:00 on January 29th
+          }
+          return true;
+        });
+        
+        const availableTimeSlots = timeSlotsForThisDay.map(time => {
           // Calculate actual seats occupied for this time slot
           const slotBookings = dayBookings.filter((b: any) => b.timeSlot === time);
           
@@ -247,6 +255,10 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       }
 
       setBookingSlots(slots);
+      // Auto-select first date
+      if (slots.length > 0) {
+        setExpandedDate(slots[0].dateKey);
+      }
       console.log(`📅 Loaded ${slots.length} available dates for first session booking (synced with main system)`);
     } catch (error) {
       console.error('❌ Error loading slots:', error);
@@ -441,12 +453,10 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
                 </p>
               </div>
               <p className="text-sm text-[#3d2f28] font-medium pl-6">
-                {packageData.packageType === 'package4' ? '4 ' : packageData.packageType === 'package8' ? '8 ' : '12 '}
+                {packageData.packageType === 'package8' ? '8 ' : packageData.packageType === 'package10' ? '10 ' : '12 '}
                 {t.sessions || 'CLASSES'}
               </p>
-              <div className="mt-3 pt-3 border-t border-[#e8e6e3]">
-                <p className="text-xs text-[#6b5949]">{t.checkEmailForCode || 'Check your email for the activation code.'}</p>
-              </div>
+
             </div>
 
             <div className="space-y-2">
@@ -517,7 +527,7 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
                   </p>
                 </div>
                 <p className="text-sm text-[#3d2f28] font-medium pl-6">
-                  {successData.packageType === 'package4' ? '4 ' : successData.packageType === 'package8' ? '8 ' : '12 '}
+                  {successData.packageType === 'package8' ? '8 ' : successData.packageType === 'package10' ? '10 ' : '12 '}
                   {t.sessions || 'CLASSES'}
                 </p>
               </div>
@@ -544,7 +554,9 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
               </div>
             ) : (
               <p className="text-sm text-[#6b5949] mb-5 leading-relaxed">
-                {t.bookingConfirmedDesc || 'Your booking has been successfully registered. You can log in to your account to manage your bookings.'}
+                {successData?.skippedFirstSession 
+                  ? (t.packageSavedDesc || 'Your package has been saved. Please visit the studio to complete payment and book your first session.')
+                  : (t.bookingConfirmedDesc || 'Check your email to complete registration. The activation code will be sent by admin after payment confirmation.')}
               </p>
             )}
             
@@ -597,54 +609,60 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
                 <p className="text-xs text-[#8b7764]">{t.tryAgainLater || 'Please try again later or contact us.'}</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {bookingSlots.map((dateSlot) => (
-                  <div key={dateSlot.dateKey} className="bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6] rounded-xl overflow-hidden border border-[#e8e6e3]/50">
+              <div className="space-y-4">
+                {/* Date Tabs - 2 large buttons */}
+                <div className="grid grid-cols-2 gap-3">
+                  {bookingSlots.map((dateSlot) => (
                     <button
-                      onClick={() => setExpandedDate(expandedDate === dateSlot.dateKey ? null : dateSlot.dateKey)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/50 transition-colors"
+                      key={dateSlot.dateKey}
+                      onClick={() => setExpandedDate(dateSlot.dateKey)}
+                      className={`px-4 py-4 rounded-xl text-center transition-all border-2 ${
+                        expandedDate === dateSlot.dateKey
+                          ? 'bg-gradient-to-br from-[#9ca571] to-[#8a9463] text-white border-[#9ca571] shadow-lg'
+                          : 'bg-white text-[#3d2f28] border-[#e8e6e3] hover:border-[#9ca571] hover:shadow-md'
+                      }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-[#9ca571]" />
-                        <span className="text-sm font-medium text-[#3d2f28]">{dateSlot.displayDate}</span>
+                      <div className="text-xs font-semibold uppercase tracking-wide opacity-80 mb-1">
+                        {dateSlot.date.toLocaleDateString(language === 'sq' ? 'sq-AL' : language === 'mk' ? 'mk-MK' : 'en-US', { weekday: 'long' })}
                       </div>
-                      {expandedDate === dateSlot.dateKey ? (
-                        <ChevronUp className="w-4 h-4 text-[#6b5949]" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-[#6b5949]" />
-                      )}
+                      <div className="text-base font-bold">
+                        {dateSlot.date.getDate()} {dateSlot.date.toLocaleDateString(language === 'sq' ? 'sq-AL' : language === 'mk' ? 'mk-MK' : 'en-US', { month: 'long' })}
+                      </div>
                     </button>
+                  ))}
+                </div>
 
-                    {expandedDate === dateSlot.dateKey && (
-                      <div className="px-4 pb-3 grid grid-cols-3 gap-2">
-                        {dateSlot.timeSlots.map((timeSlot) => (
-                          <button
-                            key={timeSlot.time}
-                            onClick={() => handleTimeSlotClick(dateSlot, timeSlot)}
-                            disabled={timeSlot.available <= 0 || isBookingFirstSession}
-                            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                              timeSlot.available > 0 && !isBookingFirstSession
-                                ? 'bg-white hover:bg-gradient-to-r hover:from-[#9ca571] hover:to-[#8a9463] text-[#3d2f28] hover:text-white hover:scale-105 active:scale-95 border border-[#e8e6e3] hover:border-transparent shadow-sm hover:shadow-md'
-                                : 'bg-[#e8e6e3]/50 text-[#8b7764]/50 cursor-not-allowed'
-                            }`}
-                          >
-                            <div className="flex items-center justify-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              <span>{timeSlot.time}</span>
-                            </div>
-                            <div className="text-[10px] mt-0.5 opacity-70">
-                              {timeSlot.available > 0 
-                                ? timeSlot.available === 1 
-                                  ? `1 ${t.spot} ${t.availableSingular}` 
-                                  : `${timeSlot.available} ${t.spots} ${t.available}`
-                                : t.slotFull || 'Full'}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                {/* Time Slots Grid */}
+                {expandedDate && bookingSlots.find(slot => slot.dateKey === expandedDate) && (
+                  <div className="bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6] rounded-xl p-4 border border-[#e8e6e3]/50">
+                    <div className="grid grid-cols-3 gap-2">
+                      {bookingSlots.find(slot => slot.dateKey === expandedDate)!.timeSlots.map((timeSlot) => (
+                        <button
+                          key={timeSlot.time}
+                          onClick={() => handleTimeSlotClick(bookingSlots.find(slot => slot.dateKey === expandedDate)!, timeSlot)}
+                          disabled={timeSlot.available <= 0 || isBookingFirstSession}
+                          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                            timeSlot.available > 0 && !isBookingFirstSession
+                              ? 'bg-white hover:bg-gradient-to-r hover:from-[#9ca571] hover:to-[#8a9463] text-[#3d2f28] hover:text-white hover:scale-105 active:scale-95 border border-[#e8e6e3] hover:border-transparent shadow-sm hover:shadow-md'
+                              : 'bg-[#e8e6e3]/50 text-[#8b7764]/50 cursor-not-allowed'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{timeSlot.time}</span>
+                          </div>
+                          <div className="text-[10px] mt-0.5 opacity-70">
+                            {timeSlot.available > 0 
+                              ? timeSlot.available === 1 
+                                ? `1 ${t.spot} ${t.availableSingular}` 
+                                : `${timeSlot.available} ${t.spots} ${t.available}`
+                              : t.slotFull || 'Full'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
             )}
 
@@ -703,9 +721,34 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
               </div>
 
               {/* Pricing */}
-              <div className="mb-4">
+              <div className="mb-3">
                 <div className="text-[32px] font-bold text-[#3d2f28] tracking-tight">
                   {pkg.price} <span className="text-base font-semibold text-[#6b5949]">DEN</span>
+                </div>
+              </div>
+
+              {/* Package Description */}
+              <div className="mb-4">
+                <p className="text-xs text-[#8b7764] leading-relaxed">
+                  {pkg.type === 'package8' && (t.package8Detail || '8 training packages in a group (twice a week). For 35 days.')}
+                  {pkg.type === 'package10' && (t.package10Detail || '10 training packages in a group (twice a week). For 35 days.')}
+                  {pkg.type === 'package12' && (t.package12Detail || '12 training packages in a group (three times a week). For 35 days.')}
+                </p>
+              </div>
+
+              {/* Key Purchase Context */}
+              <div className="mb-4 space-y-1.5">
+                <div className="flex items-center gap-2 text-xs text-[#6b5949]">
+                  <div className="w-1 h-1 bg-[#9ca571] rounded-full"></div>
+                  <span>{t.classDuration || '50 min'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b5949]">
+                  <div className="w-1 h-1 bg-[#9ca571] rounded-full"></div>
+                  <span>{t.validityPeriod || 'Valid 35 days'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b5949]">
+                  <div className="w-1 h-1 bg-[#9ca571] rounded-full"></div>
+                  <span>{t.groupClass || 'Group class'}</span>
                 </div>
               </div>
 

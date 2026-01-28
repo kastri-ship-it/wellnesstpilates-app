@@ -5,10 +5,8 @@ import * as kv from "./kv_store.tsx";
 
 const app = new Hono();
 
-// Enable logger
 app.use('*', logger(console.log));
 
-// Enable CORS for all routes and methods
 app.use(
   "/*",
   cors({
@@ -20,11 +18,87 @@ app.use(
   }),
 );
 
+// ============ CONSTANTS ============
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+
+const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '16:00', '17:00', '18:00'];
+
+const VALID_PACKAGE_TYPES = [
+  'single', 'package8', 'package10', 'package12',
+  'individual1', 'individual8', 'individual12',
+  'duo1', 'duo8', 'duo12'
+];
+
+const PACKAGE_PRICING = {
+  single: { price: 500, label: 'Single Session', description: '500 DEN per session' },
+  package8: { price: 3500, label: '8 Classes Package', description: '438 DEN per session' },
+  package10: { price: 4200, label: '10 Classes Package', description: '420 DEN per session' },
+  package12: { price: 4800, label: '12 Classes Package', description: '400 DEN per session' },
+  individual1: { price: 1600, label: '1-on-1 Single Session', description: 'Private training' },
+  individual8: { price: 12000, label: '1-on-1 8 Sessions', description: '1500 DEN per session' },
+  individual12: { price: 16800, label: '1-on-1 12 Sessions', description: '1400 DEN per session' },
+  duo1: { price: 1200, label: 'DUO Single Session', description: 'For 2 people' },
+  duo8: { price: 8800, label: 'DUO 8 Sessions', description: '1100 DEN per session' },
+  duo12: { price: 12000, label: 'DUO 12 Sessions', description: '1000 DEN per session' },
+};
+
+const STUDIO_INFO = {
+  name: 'WellNest Pilates',
+  address: 'Gjuro Gjakovikj 59, Kumanovo 1300',
+  email: 'info@wellnest-pilates.com',
+};
+
+// ============ EMAIL TRANSLATIONS ============
+
+const EMAIL_TRANSLATIONS = {
+  EN: {
+    bookingConfirmation: 'Booking Confirmation',
+    thankYou: 'Thank you for your booking!',
+    bookingDate: 'Booking Date',
+    yourSession: 'Your Session',
+    date: 'Date',
+    time: 'Time',
+    important: 'Important',
+    paymentMessage: 'Your account will be activated after payment is completed at the studio.',
+    lookForward: 'We look forward to seeing you!',
+    questionsContact: 'Questions? Contact us:',
+    subject: 'Booking Confirmation - WellNest Pilates',
+  },
+  SQ: {
+    bookingConfirmation: 'Konfirmim Rezervimi',
+    thankYou: 'Faleminderit për rezervimin tuaj!',
+    bookingDate: 'Data e Rezervimit',
+    yourSession: 'Seanca Juaj',
+    date: 'Data',
+    time: 'Ora',
+    important: 'I rëndësishëm',
+    paymentMessage: 'Llogaria juaj do të aktivizohet pas përfundimit të pagesës në studio.',
+    lookForward: 'Presim me padurim t\'ju shohim!',
+    questionsContact: 'Pyetje? Na kontaktoni:',
+    subject: 'Konfirmim Rezervimi - WellNest Pilates',
+  },
+  MK: {
+    bookingConfirmation: 'Потврда за резервација',
+    thankYou: 'Ви благодариме за вашата резервација!',
+    bookingDate: 'Датум на резервација',
+    yourSession: 'Вашата сесија',
+    date: 'Датум',
+    time: 'Време',
+    important: 'Важно',
+    paymentMessage: 'Вашата сметка ќе биде активирана по завршувањето на уплатата во студиото.',
+    lookForward: 'Се радуваме да ве видиме!',
+    questionsContact: 'Прашања? Контактирајте нѐ:',
+    subject: 'Потврда за резервација - WellNest Pilates',
+  }
+};
+
 // ============ TYPES ============
 
 type PackageType = 
   | 'single'
-  | 'package4' | 'package8' | 'package12'
+  | 'package8' | 'package10' | 'package12'
   | 'individual1' | 'individual8' | 'individual12'
   | 'duo1' | 'duo8' | 'duo12';
 
@@ -35,7 +109,11 @@ type PaymentStatus = 'unpaid' | 'paid' | 'partially_paid' | 'refunded';
 type PackageStatus = 'pending' | 'active' | 'fully_used' | 'expired' | 'cancelled';
 type ActivationStatus = 'pending' | 'activated' | 'expired';
 
-// ============ HELPER FUNCTIONS ============
+// ============ UTILITY FUNCTIONS ============
+
+function normalizeEmail(email: string): string {
+  return email.toLowerCase().trim();
+}
 
 function generateActivationCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -82,20 +160,142 @@ function calculateExpiry(activationDate: string): string {
   return date.toISOString();
 }
 
-function getPackagePriceInfo(packageType: PackageType): { price: number, label: string, description: string } {
-  const priceMap = {
-    single: { price: 500, label: 'Single Session', description: '500 DEN per session' },
-    package4: { price: 1800, label: '4 Classes Package', description: '450 DEN per session' },
-    package8: { price: 3400, label: '8 Classes Package', description: '425 DEN per session' },
-    package12: { price: 4800, label: '12 Classes Package', description: '400 DEN per session' },
-    individual1: { price: 1200, label: '1-on-1 Single Session', description: 'Private training' },
-    individual8: { price: 8800, label: '1-on-1 8 Sessions', description: '1100 DEN per session' },
-    individual12: { price: 12000, label: '1-on-1 12 Sessions', description: '1000 DEN per session' },
-    duo1: { price: 1600, label: 'DUO Single Session', description: 'For 2 people' },
-    duo8: { price: 12000, label: 'DUO 8 Sessions', description: '1500 DEN per session' },
-    duo12: { price: 16800, label: 'DUO 12 Sessions', description: '1400 DEN per session' },
+function getPackagePriceInfo(packageType: PackageType) {
+  return PACKAGE_PRICING[packageType] || PACKAGE_PRICING.single;
+}
+
+function formatDateString(dateKey: string): string {
+  const [month, day] = dateKey.split('-').map(Number);
+  return `${day} ${MONTH_NAMES[month - 1]}`;
+}
+
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const passwordHash = await hashPassword(password);
+  return passwordHash === hash;
+}
+
+async function calculateSlotCapacity(dateKey: string, timeSlot: string): Promise<{available: number, isBlocked: boolean, isPrivate: boolean}> {
+  const allReservations = await kv.getByPrefix('reservation:');
+  const slotReservations = allReservations.filter((r: any) => 
+    r.dateKey === dateKey && 
+    r.timeSlot === timeSlot && 
+    (r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
+  );
+
+  const hasPrivateSession = slotReservations.some((r: any) => r.isPrivateSession);
+  if (hasPrivateSession) {
+    return { available: 0, isBlocked: true, isPrivate: true };
+  }
+
+  const seatsOccupied = slotReservations.reduce((total: number, r: any) => {
+    return total + (r.seatsOccupied || 1);
+  }, 0);
+
+  return {
+    available: Math.max(0, 4 - seatsOccupied),
+    isBlocked: seatsOccupied >= 4,
+    isPrivate: false
   };
-  return priceMap[packageType] || priceMap.single;
+}
+
+// ============ EMAIL FUNCTIONS ============
+
+function getEmailHeader(): string {
+  return `
+    <tr>
+      <td style="background-color: #9ca571; padding: 40px 40px 30px 40px; text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">${STUDIO_INFO.name}</h1>
+        <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px; opacity: 0.9;">${STUDIO_INFO.address}</p>
+      </td>
+    </tr>
+  `;
+}
+
+function getEmailFooter(language: string = 'EN'): string {
+  const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
+  
+  return `
+    <tr>
+      <td style="background-color: #f5f0ed; padding: 30px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #6b5949; font-size: 14px;">${t.questionsContact}</p>
+        <p style="margin: 0; color: #9ca571; font-size: 14px;">
+          📍 ${STUDIO_INFO.address}<br>
+          📧 ${STUDIO_INFO.email}
+        </p>
+      </td>
+    </tr>
+  `;
+}
+
+function buildEmailTemplate(content: string, language: string = 'EN'): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f0ed;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                ${getEmailHeader()}
+                <tr>
+                  <td style="padding: 40px;">
+                    ${content}
+                  </td>
+                </tr>
+                ${getEmailFooter(language)}
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+async function sendEmail(to: string, subject: string, htmlContent: string, language: string = 'EN') {
+  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+  if (!RESEND_API_KEY) {
+    console.error('RESEND_API_KEY not configured');
+    throw new Error('Email service not configured');
+  }
+
+  const emailResponse = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `${STUDIO_INFO.name} <onboarding@resend.dev>`,
+      to: [to],
+      subject,
+      html: buildEmailTemplate(htmlContent, language),
+    }),
+  });
+
+  if (!emailResponse.ok) {
+    const errorText = await emailResponse.text();
+    console.error('Email sending failed:', errorText);
+    throw new Error(`Failed to send email: ${errorText}`);
+  }
+
+  const result = await emailResponse.json();
+  console.log('Email sent successfully to:', to, 'in language:', language);
+  return result;
 }
 
 async function sendActivationEmail(
@@ -111,19 +311,12 @@ async function sendActivationEmail(
     instructor: string;
   }
 ) {
-  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-  if (!RESEND_API_KEY) {
-    console.error('RESEND_API_KEY not configured');
-    throw new Error('Email service not configured');
-  }
-
   const { price, label: packageName } = getPackagePriceInfo(packageType);
-  const packageInfo = `${packageName} - ${price} DEN`;
   const sessionCount = extractSessionCount(packageType);
 
   const firstSessionHtml = firstSessionDetails ? `
     <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 Your First Session</h3>
+      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 Your First Class</h3>
       <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
         <strong>Date:</strong> ${firstSessionDetails.date}<br>
         <strong>Time:</strong> ${firstSessionDetails.timeSlot} - ${firstSessionDetails.endTime}<br>
@@ -131,118 +324,59 @@ async function sendActivationEmail(
       </p>
     </div>
     <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 15px; line-height: 1.6;">
-      <strong>Remaining sessions:</strong> ${sessionCount - 1} more session${sessionCount - 1 !== 1 ? 's' : ''} to book through your dashboard.
+      <strong>Remaining classes:</strong> ${sessionCount - 1} more class${sessionCount - 1 !== 1 ? 'es' : ''} to book through your dashboard.
     </p>
   ` : '';
 
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f0ed;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; padding: 40px 20px;">
-          <tr>
-            <td align="center">
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <tr>
-                  <td style="background-color: #9ca571; padding: 40px 40px 30px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">WellNest Pilates</h1>
-                    <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px; opacity: 0.9;">Gjuro Gjakovikj 59, Kumanovo 1300</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 40px;">
-                    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">Welcome, ${name}${surname ? ' ' + surname : ''}! 🎉</h2>
-                    
-                    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-                      Thank you for choosing WellNest Pilates! Your ${packageName} ${firstSessionDetails ? 'package is ready to be activated' : 'booking is confirmed'}.
-                    </p>
-                    
-                    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 30px 0;">
-                      <p style="margin: 0 0 12px 0; color: #6b5949; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Activation Code</p>
-                      <p style="margin: 0; color: #3d2f28; font-size: 32px; font-weight: bold; letter-spacing: 2px; font-family: 'Courier New', monospace;">
-                        ${activationCode}
-                      </p>
-                    </div>
-                    
-                    <div style="background-color: #fff8f0; border-left: 4px solid #9ca571; padding: 16px; margin: 24px 0;">
-                      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-                        <strong style="color: #3d2f28;">Package Details:</strong><br>
-                        ${packageInfo}
-                      </p>
-                    </div>
-                    
-                    ${firstSessionHtml}
-                    
-                    <h3 style="margin: 30px 0 16px 0; color: #3d2f28; font-size: 18px;">How to Activate:</h3>
-                    <ol style="margin: 0; padding-left: 20px; color: #6b5949; font-size: 15px; line-height: 1.8;">
-                      <li>Open the WellNest Pilates booking app</li>
-                      <li>Click on "Member Login" or "Activate Member Area"</li>
-                      <li>Enter your email and the activation code above</li>
-                      <li>Start ${firstSessionDetails ? 'booking your remaining sessions' : 'enjoying your Pilates journey'}!</li>
-                    </ol>
-                    
-                    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 30px 0;">
-                      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 14px; font-weight: 600;">Important:</p>
-                      <ul style="margin: 0; padding-left: 20px; color: #6b5949; font-size: 14px; line-height: 1.6;">
-                        <li>Payment is due in the studio before your session</li>
-                        <li>Please arrive 10 minutes early for your first session</li>
-                        <li>Cancellations must be made at least 24 hours in advance</li>
-                        <li>This activation code expires in 24 hours</li>
-                      </ul>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="background-color: #f5f0ed; padding: 30px; text-align: center;">
-                    <p style="margin: 0 0 10px 0; color: #6b5949; font-size: 14px;">Questions? Contact us:</p>
-                    <p style="margin: 0; color: #9ca571; font-size: 14px;">
-                      📍 Gjuro Gjakovikj 59, Kumanovo 1300<br>
-                      📧 info@wellnest-pilates.com
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-    </html>
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">Welcome, ${name}${surname ? ' ' + surname : ''}! 🎉</h2>
+    
+    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
+      Thank you for choosing ${STUDIO_INFO.name}! Your ${packageName} ${firstSessionDetails ? 'package is ready to be activated' : 'booking is confirmed'}.
+    </p>
+    
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 30px 0;">
+      <p style="margin: 0 0 12px 0; color: #6b5949; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Activation Code</p>
+      <p style="margin: 0; color: #3d2f28; font-size: 32px; font-weight: bold; letter-spacing: 2px; font-family: 'Courier New', monospace;">
+        ${activationCode}
+      </p>
+    </div>
+    
+    <div style="background-color: #fff8f0; border-left: 4px solid #9ca571; padding: 16px; margin: 24px 0;">
+      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+        <strong style="color: #3d2f28;">Package Details:</strong><br>
+        ${packageName} - ${price} DEN
+      </p>
+    </div>
+    
+    ${firstSessionHtml}
+    
+    <h3 style="margin: 30px 0 16px 0; color: #3d2f28; font-size: 18px;">How to Activate:</h3>
+    <ol style="margin: 0; padding-left: 20px; color: #6b5949; font-size: 15px; line-height: 1.8;">
+      <li>Open the ${STUDIO_INFO.name} booking app</li>
+      <li>Click on "Member Login" or "Activate Member Area"</li>
+      <li>Enter your email and the activation code above</li>
+      <li>Start ${firstSessionDetails ? 'booking your remaining sessions' : 'enjoying your Pilates journey'}!</li>
+    </ol>
+    
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 30px 0;">
+      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 14px; font-weight: 600;">Important:</p>
+      <ul style="margin: 0; padding-left: 20px; color: #6b5949; font-size: 14px; line-height: 1.6;">
+        <li>Payment is due in the studio before your class</li>
+        <li>Please arrive 10 minutes early for your first class</li>
+        <li>Cancellations must be made at least 24 hours in advance</li>
+        <li>This activation code expires in 24 hours</li>
+      </ul>
+    </div>
   `;
 
-  try {
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'WellNest Pilates <onboarding@resend.dev>',
-        to: [email],
-        subject: firstSessionDetails 
-          ? `Activate Your ${packageName} Package - WellNest Pilates`
-          : `Confirm Your Booking - WellNest Pilates`,
-        html: emailHtml,
-      }),
-    });
-
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('Email sending failed:', errorText);
-      throw new Error(`Failed to send email: ${errorText}`);
-    }
-
-    const result = await emailResponse.json();
-    console.log('Email sent successfully:', result);
-    return result;
-  } catch (error) {
-    console.error('Error sending activation email:', error);
-    throw error;
-  }
+  return sendEmail(
+    email,
+    firstSessionDetails 
+      ? `Activate Your ${packageName} Package - ${STUDIO_INFO.name}`
+      : `Confirm Your Booking - ${STUDIO_INFO.name}`,
+    content
+  );
 }
 
 async function sendRegistrationEmail(
@@ -254,176 +388,54 @@ async function sendRegistrationEmail(
   firstSessionDate: string,
   firstSessionTime: string,
   firstSessionEndTime: string,
-  appUrl: string
+  appUrl: string,
+  language: string = 'EN'
 ) {
-  console.log('📧 === INSIDE sendRegistrationEmail() ===');
-  console.log('📧 To:', email);
-  console.log('📧 Name:', name, surname);
-  console.log('📧 Package:', packageType);
-  console.log('📧 Session date:', firstSessionDate);
-  console.log('📧 Session time:', firstSessionTime, '-', firstSessionEndTime);
+  // Normalize language to uppercase and default to EN if invalid
+  const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
   
-  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-  console.log('📧 RESEND_API_KEY exists?', !!RESEND_API_KEY);
-  console.log('📧 RESEND_API_KEY value:', RESEND_API_KEY ? `${RESEND_API_KEY.substring(0, 10)}...` : 'NOT SET');
-  
-  if (!RESEND_API_KEY) {
-    console.error('❌ RESEND_API_KEY not configured');
-    throw new Error('Email service not configured');
-  }
-
-  // App URL is passed from frontend so it works in preview AND production
-  const setupLink = `${appUrl}#/setup-password?token=${verificationToken}`;
-  
-  console.log(`📧 Registration link: ${setupLink}`);
   const { label: packageName } = getPackagePriceInfo(packageType);
-  console.log('📧 Package name:', packageName);
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f0ed;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; padding: 40px 20px;">
-          <tr>
-            <td align="center">
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <tr>
-                  <td style="background-color: #9ca571; padding: 40px 40px 30px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">WellNest Pilates</h1>
-                    <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px; opacity: 0.9;">Gjuro Gjakovikj 59, Kumanovo 1300</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 40px;">
-                    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">Welcome, ${name}${surname ? ' ' + surname : ''}! 🎉</h2>
-                    
-                    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-                      Thank you for booking with WellNest Pilates! Your ${packageName} is ready to be activated. To access your member area and manage your bookings, please complete your registration.
-                    </p>
-                    
-                    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-                      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 Your First Session</h3>
-                      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
-                        <strong>Date:</strong> ${firstSessionDate}<br>
-                        <strong>Time:</strong> ${firstSessionTime} - ${firstSessionEndTime}
-                      </p>
-                    </div>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                      <a href="${setupLink}" style="display: inline-block; background-color: #9ca571; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 600;">Complete Registration</a>
-                    </div>
-                    
-                    <p style="margin: 20px 0; color: #8b7764; font-size: 14px; line-height: 1.6;">
-                      Or copy and paste this link into your browser:<br>
-                      <span style="color: #9ca571; word-break: break-all;">${setupLink}</span>
-                    </p>
-                    
-                    <div style="background-color: #fff8f0; border-left: 4px solid #9ca571; padding: 16px; margin: 24px 0;">
-                      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-                        <strong style="color: #3d2f28;">Important:</strong><br>
-                        • This link will expire in 24 hours<br>
-                        • After setting up your password, you can log in anytime<br>
-                        • Your package activation code will be sent separately by our admin after payment confirmation<br>
-                        • You can log in before receiving the activation code
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="background-color: #f5f0ed; padding: 30px; text-align: center;">
-                    <p style="margin: 0 0 10px 0; color: #6b5949; font-size: 14px;">Questions? Contact us:</p>
-                    <p style="margin: 0; color: #9ca571; font-size: 14px;">
-                      📍 Gjuro Gjakovikj 59, Kumanovo 1300<br>
-                      📧 info@wellnest-pilates.com
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-    </html>
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.bookingConfirmation}</h2>
+    
+    <p style="margin: 0 0 10px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
+      ${t.thankYou}
+    </p>
+    
+    <p style="margin: 0 0 20px 0; color: #8b7764; font-size: 14px;">
+      <strong>${t.bookingDate}:</strong> ${currentDate}
+    </p>
+    
+    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${t.yourSession}</h3>
+      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
+        <strong>${t.date}:</strong> ${firstSessionDate}<br>
+        <strong>${t.time}:</strong> ${firstSessionTime} - ${firstSessionEndTime}
+      </p>
+    </div>
+    
+    <div style="background-color: #fff8f0; border-left: 4px solid #9ca571; padding: 20px; margin: 24px 0;">
+      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.6;">
+        <strong style="color: #3d2f28;">${t.important}:</strong><br>
+        ${t.paymentMessage}
+      </p>
+    </div>
+    
+    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+      ${t.lookForward}
+    </p>
   `;
 
-  try {
-    console.log('📧 Preparing to call Resend API...');
-    
-    const emailPayload = {
-      from: 'WellNest Pilates <onboarding@resend.dev>',
-      to: [email],
-      subject: 'Complete Your Registration - WellNest Pilates',
-      html: emailHtml,
-    };
-    
-    console.log('📧 Email payload:', {
-      from: emailPayload.from,
-      to: emailPayload.to,
-      subject: emailPayload.subject,
-      htmlLength: emailHtml.length
-    });
-    
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailPayload),
-    });
-
-    console.log('📧 Resend API response status:', emailResponse.status);
-    console.log('📧 Resend API response ok?', emailResponse.ok);
-
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('❌ Email sending failed. Status:', emailResponse.status);
-      console.error('❌ Error response:', errorText);
-      throw new Error(`Failed to send email (${emailResponse.status}): ${errorText}`);
-    }
-
-    const result = await emailResponse.json();
-    console.log('✅ Registration email sent successfully!');
-    console.log('✅ Resend response:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ Error in sendRegistrationEmail():', error);
-    console.error('❌ Error message:', error.message);
-    if (error.stack) {
-      console.error('❌ Stack trace:', error.stack);
-    }
-    throw error;
-  }
-}
-
-async function calculateSlotCapacity(dateKey: string, timeSlot: string): Promise<{available: number, isBlocked: boolean, isPrivate: boolean}> {
-  const allReservations = await kv.getByPrefix('reservation:');
-  const slotReservations = allReservations.filter((r: any) => 
-    r.dateKey === dateKey && 
-    r.timeSlot === timeSlot && 
-    (r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
-  );
-
-  // Check for private session (1-on-1)
-  const hasPrivateSession = slotReservations.some((r: any) => r.isPrivateSession);
-  if (hasPrivateSession) {
-    return { available: 0, isBlocked: true, isPrivate: true };
-  }
-
-  // Calculate seats occupied
-  const seatsOccupied = slotReservations.reduce((total: number, r: any) => {
-    return total + (r.seatsOccupied || 1);
-  }, 0);
-
-  return {
-    available: Math.max(0, 4 - seatsOccupied),
-    isBlocked: seatsOccupied >= 4,
-    isPrivate: false
-  };
+  return sendEmail(email, t.subject, content, language);
 }
 
 // ============ HEALTH CHECK ============
@@ -434,39 +446,31 @@ app.get("/make-server-b87b0c07/health", (c) => {
 
 // ============ PACKAGE ENDPOINTS ============
 
-// Create package (step 1 of package purchase - does NOT book first session yet)
 app.post("/make-server-b87b0c07/packages", async (c) => {
   try {
     const body = await c.req.json();
     const { userId, packageType, name, surname, mobile, email, language, paymentToken } = body;
 
-    // Validate required fields
     if (!userId || !packageType || !name || !surname || !mobile || !email) {
       return c.json({ error: "Missing required fields" }, 400);
     }
 
-    // Validate packageType
-    const validPackageTypes = [
-      'single', 'package4', 'package8', 'package12',
-      'individual1', 'individual8', 'individual12',
-      'duo1', 'duo8', 'duo12'
-    ];
-    if (!validPackageTypes.includes(packageType)) {
+    if (!VALID_PACKAGE_TYPES.includes(packageType)) {
       return c.json({ error: "Invalid package type" }, 400);
     }
 
-    // Single session should not use this endpoint
     if (packageType === 'single') {
       return c.json({ error: "Use /reservations endpoint for single sessions" }, 400);
     }
 
-    // Create or get user
-    const userKey = `user:${email}`;
+    const normalizedEmail = normalizeEmail(email);
+    const userKey = `user:${normalizedEmail}`;
     let user = await kv.get(userKey);
+    
     if (!user) {
       user = {
         id: userKey,
-        email,
+        email: normalizedEmail,
         name,
         surname,
         mobile,
@@ -475,40 +479,34 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
         blocked: false
       };
       await kv.set(userKey, user);
-      console.log(`User created: ${email}`);
+      console.log(`User created: ${normalizedEmail}`);
     }
 
-    // Generate package ID
-    const packageId = `package:${email}:${Date.now()}`;
+    const packageId = `package:${normalizedEmail}:${Date.now()}`;
     const totalSessions = extractSessionCount(packageType);
-
-    // Generate activation code
     const activationCode = generateActivationCode();
     const codeKey = `activation_code:${activationCode}`;
     const codeExpiry = new Date();
     codeExpiry.setHours(codeExpiry.getHours() + 24);
 
-    // Check if payment token provided
     let paymentStatus: PaymentStatus = 'unpaid';
     let paymentId: string | null = null;
 
     if (paymentToken) {
       const payment = await kv.get(`payment:token:${paymentToken}`);
-      if (payment && !payment.tokenUsed && payment.userId === email) {
+      if (payment && !payment.tokenUsed && payment.userId === normalizedEmail) {
         paymentStatus = 'paid';
         paymentId = payment.id;
         payment.tokenUsed = true;
         payment.packageId = packageId;
         payment.linkedAt = new Date().toISOString();
         await kv.set(payment.id, payment);
-        console.log(`Payment token ${paymentToken} linked to package ${packageId}`);
       }
     }
 
-    // Create package (without firstReservationId - will be set when first session booked)
     const pkg = {
       id: packageId,
-      userId: email,
+      userId: normalizedEmail,
       packageType,
       totalSessions,
       remainingSessions: totalSessions,
@@ -520,13 +518,13 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
       packageStatus: 'pending' as PackageStatus,
       activationStatus: 'pending' as ActivationStatus,
       paymentStatus,
-      firstReservationId: null, // Will be set when first session is booked
+      firstReservationId: null,
       paymentId,
       activationCodeId: codeKey,
       name,
       surname,
       mobile,
-      email,
+      email: normalizedEmail,
       language: language || 'en',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -534,11 +532,10 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
 
     await kv.set(packageId, pkg);
 
-    // Create activation code
     const activationCodeData = {
       id: codeKey,
       code: activationCode,
-      email,
+      email: normalizedEmail,
       packageId,
       reservationId: null,
       status: 'active',
@@ -548,11 +545,8 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
     };
 
     await kv.set(codeKey, activationCodeData);
-
     console.log(`Package created: ${packageId}, activation code: ${activationCode}`);
-    console.log('⚠️  First session NOT yet booked - user must select date/time next');
 
-    // DO NOT send email yet - wait for first session booking
     return c.json({
       success: true,
       package: pkg,
@@ -568,14 +562,12 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
   }
 });
 
-// Book first session for package (step 2 of package purchase - MANDATORY)
 app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
   try {
     const packageId = c.req.param('id');
     const body = await c.req.json();
     const { dateKey, timeSlot, instructor, partnerName, partnerSurname, appUrl } = body;
 
-    // Validate required fields
     if (!dateKey || !timeSlot || !instructor) {
       return c.json({ error: "Missing required fields: dateKey, timeSlot, instructor" }, 400);
     }
@@ -584,13 +576,11 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
       return c.json({ error: "Missing app URL for email link" }, 400);
     }
 
-    // Get package
     const pkg = await kv.get(packageId);
     if (!pkg) {
       return c.json({ error: "Package not found" }, 404);
     }
 
-    // Validate package is pending and has no first reservation yet
     if (pkg.firstReservationId !== null) {
       return c.json({ error: "First session already booked for this package" }, 400);
     }
@@ -599,19 +589,14 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
       return c.json({ error: "Package is not in pending state" }, 400);
     }
 
-    // Extract service type
     const serviceType = extractServiceType(pkg.packageType);
-
-    // Validate slot availability
     const capacity = await calculateSlotCapacity(dateKey, timeSlot);
     
     if (serviceType === 'individual') {
-      // 1-on-1 requires empty slot
       if (capacity.available < 4) {
         return c.json({ error: "Slot not available for 1-on-1 session (must be empty)" }, 400);
       }
     } else if (serviceType === 'duo') {
-      // DUO requires 2 seats
       if (capacity.available < 2) {
         return c.json({ error: "Slot does not have enough space for DUO (requires 2 spots)" }, 400);
       }
@@ -619,19 +604,12 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
         return c.json({ error: "Partner name and surname required for DUO bookings" }, 400);
       }
     } else {
-      // Regular package session requires 1 seat
       if (capacity.available < 1) {
         return c.json({ error: "Slot is full" }, 400);
       }
     }
 
-    // Get date string (e.g., "23 January")
-    const [month, day] = dateKey.split('-').map(Number);
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-    const dateString = `${day} ${monthNames[month - 1]}`;
-
-    // Create reservation
+    const dateString = formatDateString(dateKey);
     const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const fullDate = constructFullDate(dateKey, timeSlot);
     const endTime = calculateEndTime(timeSlot);
@@ -655,7 +633,7 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
       partnerName: partnerName || null,
       partnerSurname: partnerSurname || null,
       reservationStatus: 'pending' as ReservationStatus,
-      paymentStatus: pkg.paymentStatus, // Inherit from package
+      paymentStatus: pkg.paymentStatus,
       seatsOccupied: serviceType === 'duo' ? 2 : (serviceType === 'individual' ? 4 : 1),
       isPrivateSession: serviceType === 'individual',
       isOverbooked: false,
@@ -674,31 +652,20 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
 
     await kv.set(reservationId, reservation);
 
-    // Update package with first reservation
     pkg.firstReservationId = reservationId;
     pkg.sessionsBooked = [reservationId];
     pkg.updatedAt = new Date().toISOString();
     await kv.set(packageId, pkg);
 
-    // Send registration email with password setup link (NO activation code)
-    // Activation code will be sent manually by admin after payment confirmation
     try {
-      // Check if user already has password set up
       const user = await kv.get(`user:${pkg.email}`);
-      console.log('🔍 Checking user registration status for:', pkg.email);
-      console.log('🔍 User exists?', !!user);
-      console.log('🔍 User has passwordHash?', !!user?.passwordHash);
       
       if (!user || !user.passwordHash) {
-        console.log('✅ User needs registration - preparing to send email...');
-        
-        // User needs to complete registration - send password setup link
         const verificationToken = `verify_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
         const tokenKey = `verification_token:${verificationToken}`;
         const tokenExpiry = new Date();
         tokenExpiry.setHours(tokenExpiry.getHours() + 24);
 
-        // Store verification token
         const tokenData = {
           id: tokenKey,
           token: verificationToken,
@@ -708,26 +675,15 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
           createdAt: new Date().toISOString()
         };
         await kv.set(tokenKey, tokenData);
-        console.log('✅ Verification token stored:', tokenKey);
 
-        // Update user with verification token
         if (user) {
           user.verificationToken = verificationToken;
           user.verified = false;
           user.passwordHash = null;
           user.updatedAt = new Date().toISOString();
           await kv.set(`user:${pkg.email}`, user);
-          console.log('✅ User record updated');
         }
 
-        // ALWAYS send registration email
-        const registrationLink = `${appUrl}#/setup-password?token=${verificationToken}`;
-        console.log('📧 About to call sendRegistrationEmail()...');
-        console.log('📧 Email:', pkg.email);
-        console.log('��� Name:', pkg.name);
-        console.log('📧 Surname:', pkg.surname);
-        console.log('🔗 Link:', registrationLink);
-        
         await sendRegistrationEmail(
           pkg.email,
           pkg.name,
@@ -737,26 +693,16 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
           dateString,
           timeSlot,
           endTime,
-          appUrl
+          appUrl,
+          pkg.language
         );
-        console.log('✅✅✅ Registration email SENT SUCCESSFULLY to:', pkg.email);
-      } else {
-        // User already has account
-        console.log('⚠️ User already has password - no registration email sent');
+        console.log(`Registration email sent to: ${pkg.email} in language: ${pkg.language}`);
       }
     } catch (emailError) {
-      console.error('❌❌❌ ERROR sending registration email:', emailError);
-      console.error('❌ Error details:', emailError.message);
-      if (emailError.stack) {
-        console.error('❌ Stack trace:', emailError.stack);
-      }
-      // Don't fail the booking if email fails
+      console.error('Error sending registration email:', emailError);
     }
 
     console.log(`First session booked for package ${packageId}: ${reservationId}`);
-    console.log(`Reservation: ${dateString} at ${timeSlot}`);
-    console.log(`✅ Package purchase flow complete - registration link sent`);
-    console.log(`⚠️  Admin must manually send activation code after payment confirmation`);
 
     return c.json({
       success: true,
@@ -775,17 +721,15 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
   }
 });
 
-// Get packages for user
 app.get("/make-server-b87b0c07/packages", async (c) => {
   try {
     const userId = c.req.query('userId');
     
     if (userId) {
-      // Get packages for specific user
-      const allPackages = await kv.getByPrefix(`package:${userId}:`);
+      const normalizedEmail = normalizeEmail(userId);
+      const allPackages = await kv.getByPrefix(`package:${normalizedEmail}:`);
       return c.json({ success: true, packages: allPackages });
     } else {
-      // Admin: get all packages
       const allPackages = await kv.getByPrefix('package:');
       return c.json({ success: true, packages: allPackages });
     }
@@ -795,7 +739,6 @@ app.get("/make-server-b87b0c07/packages", async (c) => {
   }
 });
 
-// Get single package
 app.get("/make-server-b87b0c07/packages/:id", async (c) => {
   try {
     const packageId = c.req.param('id');
@@ -814,7 +757,6 @@ app.get("/make-server-b87b0c07/packages/:id", async (c) => {
 
 // ============ RESERVATION ENDPOINTS ============
 
-// Create reservation (for single session OR subsequent package sessions)
 app.post("/make-server-b87b0c07/reservations", async (c) => {
   try {
     const body = await c.req.json();
@@ -834,7 +776,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       language
     } = body;
 
-    // Validate required fields
     if (!userId || !serviceType || !dateKey || !timeSlot || !instructor) {
       return c.json({ error: "Missing required fields" }, 400);
     }
@@ -843,19 +784,18 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       return c.json({ error: "Missing personal information" }, 400);
     }
 
-    // Determine if this is single session or package session
+    const normalizedEmail = normalizeEmail(email);
     const isPackageSession = !!packageId;
     let pkg = null;
     let sessionNumber = null;
 
     if (isPackageSession) {
-      // Get and validate package
       pkg = await kv.get(packageId);
       if (!pkg) {
         return c.json({ error: "Package not found" }, 404);
       }
 
-      if (pkg.userId !== userId) {
+      if (pkg.userId !== normalizedEmail) {
         return c.json({ error: "Package does not belong to this user" }, 403);
       }
 
@@ -867,7 +807,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
         return c.json({ error: "No remaining sessions in package" }, 400);
       }
 
-      // Check expiry
       if (pkg.expiryDate && new Date(pkg.expiryDate) < new Date()) {
         return c.json({ error: "Package has expired" }, 400);
       }
@@ -875,7 +814,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       sessionNumber = pkg.sessionsBooked.length + 1;
     }
 
-    // Validate slot availability
     const capacity = await calculateSlotCapacity(dateKey, timeSlot);
     
     if (serviceType === 'individual') {
@@ -895,10 +833,9 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       }
     }
 
-    // Check for duplicate booking (same user, same time)
     const allReservations = await kv.getByPrefix('reservation:');
     const duplicateBooking = allReservations.find((r: any) => 
-      r.userId === userId &&
+      r.userId === normalizedEmail &&
       r.dateKey === dateKey &&
       r.timeSlot === timeSlot &&
       (r.reservationStatus === 'pending' || r.reservationStatus === 'confirmed')
@@ -908,26 +845,17 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       return c.json({ error: "You already have a booking at this time" }, 400);
     }
 
-    // Get date string
-    const [month, day] = dateKey.split('-').map(Number);
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-    const dateString = `${day} ${monthNames[month - 1]}`;
-
-    // Create reservation
+    const dateString = formatDateString(dateKey);
     const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const fullDate = constructFullDate(dateKey, timeSlot);
     const endTime = calculateEndTime(timeSlot);
 
-    // Determine reservation status
-    // - Single sessions: pending (requires activation)
-    // - Subsequent package sessions: confirmed (auto-confirmed)
     const reservationStatus: ReservationStatus = isPackageSession ? 'confirmed' : 'pending';
     const autoConfirmed = isPackageSession;
 
     const reservation = {
       id: reservationId,
-      userId,
+      userId: normalizedEmail,
       packageId: packageId || null,
       sessionNumber,
       serviceType,
@@ -939,7 +867,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       instructor,
       name,
       surname,
-      email,
+      email: normalizedEmail,
       mobile,
       partnerName: partnerName || null,
       partnerSurname: partnerSurname || null,
@@ -963,9 +891,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
 
     await kv.set(reservationId, reservation);
 
-    // Handle single session vs package session differently
     if (isPackageSession) {
-      // Subsequent package session - update package
       pkg.remainingSessions--;
       pkg.sessionsBooked.push(reservationId);
       pkg.updatedAt = new Date().toISOString();
@@ -975,9 +901,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       }
       
       await kv.set(packageId, pkg);
-
       console.log(`Subsequent package session booked: ${reservationId} (session ${sessionNumber}/${pkg.totalSessions})`);
-      console.log(`Package ${packageId} remaining sessions: ${pkg.remainingSessions}`);
 
       return c.json({
         success: true,
@@ -989,7 +913,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       });
 
     } else {
-      // Single session - generate activation code and send email
       const activationCode = generateActivationCode();
       const codeKey = `activation_code:${activationCode}`;
       const codeExpiry = new Date();
@@ -998,7 +921,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       const activationCodeData = {
         id: codeKey,
         code: activationCode,
-        email,
+        email: normalizedEmail,
         packageId: null,
         reservationId,
         status: 'active',
@@ -1009,15 +932,13 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
 
       await kv.set(codeKey, activationCodeData);
 
-      // Create or get user for single session bookings
-      const userKey = `user:${email}`;
+      const userKey = `user:${normalizedEmail}`;
       let user = await kv.get(userKey);
       
       if (!user) {
-        // Create new user
         user = {
           id: userKey,
-          email,
+          email: normalizedEmail,
           name,
           surname,
           mobile,
@@ -1028,13 +949,12 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
           verified: false
         };
         await kv.set(userKey, user);
-        console.log(`✅ User created for single session booking: ${email}`);
+        console.log(`User created for single session booking: ${normalizedEmail}`);
       }
 
-      // Send activation email with activation code
       try {
         await sendActivationEmail(
-          email,
+          normalizedEmail,
           name,
           surname,
           activationCode,
@@ -1046,54 +966,39 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
             instructor
           }
         );
-        console.log(`✅ Activation email sent with code: ${activationCode}`);
       } catch (emailError) {
-        console.error('❌ Failed to send activation email:', emailError);
-        // Don't fail the booking if email fails
+        console.error('Failed to send activation email:', emailError);
       }
 
-      // Send registration email if user doesn't have password yet
       try {
-        console.log('🔍 Checking if user needs registration email for single session...');
-        console.log('🔍 User has passwordHash?', !!user?.passwordHash);
-        
         if (!user || !user.passwordHash) {
-          console.log('✅ User needs registration - preparing to send email...');
-          
-          // Generate verification token for password setup
           const verificationToken = `verify_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
           const tokenKey = `verification_token:${verificationToken}`;
           const tokenExpiry = new Date();
           tokenExpiry.setHours(tokenExpiry.getHours() + 24);
 
-          // Store verification token
           const tokenData = {
             id: tokenKey,
             token: verificationToken,
-            email: email,
+            email: normalizedEmail,
             expiresAt: tokenExpiry.toISOString(),
             used: false,
             createdAt: new Date().toISOString()
           };
           await kv.set(tokenKey, tokenData);
-          console.log('✅ Verification token stored:', tokenKey);
 
-          // Update user with verification token
           if (user) {
             user.verificationToken = verificationToken;
             user.verified = false;
             user.passwordHash = null;
             user.updatedAt = new Date().toISOString();
             await kv.set(userKey, user);
-            console.log('✅ User record updated');
           }
 
-          // Get app URL from request origin
           const appUrl = c.req.header('origin') || c.req.header('referer') || 'https://app.wellnest-pilates.com';
-          console.log('📧 About to send registration email for single session...');
           
           await sendRegistrationEmail(
-            email,
+            normalizedEmail,
             name,
             surname,
             verificationToken,
@@ -1101,24 +1006,15 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
             dateString,
             timeSlot,
             endTime,
-            appUrl
+            appUrl,
+            language
           );
-          console.log('✅✅✅ Registration email SENT SUCCESSFULLY to:', email);
-        } else {
-          console.log('⚠️ User already has password - no registration email sent');
         }
       } catch (emailError) {
-        console.error('❌❌❌ ERROR sending registration email:', emailError);
-        console.error('❌ Error details:', emailError.message);
-        if (emailError.stack) {
-          console.error('❌ Stack trace:', emailError.stack);
-        }
-        // Don't fail the booking if email fails
+        console.error('Error sending registration email:', emailError);
       }
 
-      console.log(`Single session reserved: ${reservationId}`);
-      console.log(`Activation code: ${activationCode} (sent via email)`);
-      console.log(`✅ Complete flow: User created + Activation email sent + Registration email sent`);
+      console.log(`Single session reserved: ${reservationId}, activation code: ${activationCode}`);
 
       return c.json({
         success: true,
@@ -1136,7 +1032,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
   }
 });
 
-// Get all reservations (with filters)
 app.get("/make-server-b87b0c07/reservations", async (c) => {
   try {
     const userId = c.req.query('userId');
@@ -1146,9 +1041,9 @@ app.get("/make-server-b87b0c07/reservations", async (c) => {
 
     let reservations = await kv.getByPrefix('reservation:');
 
-    // Apply filters
     if (userId) {
-      reservations = reservations.filter((r: any) => r.userId === userId);
+      const normalizedEmail = normalizeEmail(userId);
+      reservations = reservations.filter((r: any) => r.userId === normalizedEmail);
     }
 
     if (dateKey) {
@@ -1163,8 +1058,6 @@ app.get("/make-server-b87b0c07/reservations", async (c) => {
       reservations = reservations.filter((r: any) => r.paymentStatus === paymentStatus);
     }
 
-    console.log(`Retrieved ${reservations.length} reservations (filters: ${JSON.stringify({ userId, dateKey, status, paymentStatus })})`);
-
     return c.json({ success: true, reservations });
   } catch (error) {
     console.error('Error fetching reservations:', error);
@@ -1172,7 +1065,6 @@ app.get("/make-server-b87b0c07/reservations", async (c) => {
   }
 });
 
-// Get single reservation
 app.get("/make-server-b87b0c07/reservations/:id", async (c) => {
   try {
     const reservationId = c.req.param('id');
@@ -1189,76 +1081,58 @@ app.get("/make-server-b87b0c07/reservations/:id", async (c) => {
   }
 });
 
-// Update reservation status
 app.patch("/make-server-b87b0c07/reservations/:id/status", async (c) => {
   try {
     const reservationId = c.req.param('id');
     const body = await c.req.json();
-    const { status, cancelledBy, cancelReason } = body;
+    const { reservationStatus, paymentStatus, cancelReason } = body;
 
     const reservation = await kv.get(reservationId);
     if (!reservation) {
       return c.json({ error: 'Reservation not found' }, 404);
     }
 
-    const oldStatus = reservation.reservationStatus;
-
-    // Handle cancellation
-    if (status === 'cancelled') {
-      const now = new Date();
-      const sessionTime = new Date(reservation.fullDate);
-      const hoursUntil = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-      reservation.cancelledAt = now.toISOString();
-      reservation.cancelledBy = cancelledBy || 'user';
-      reservation.cancelReason = cancelReason || 'User requested cancellation';
-
-      // Determine if late cancellation
-      if (hoursUntil < 24 && cancelledBy !== 'admin') {
-        reservation.lateCancellation = true;
+    if (reservationStatus) {
+      reservation.reservationStatus = reservationStatus;
+      
+      if (reservationStatus === 'confirmed' && !reservation.activatedAt) {
+        reservation.activatedAt = new Date().toISOString();
+      }
+      
+      if (reservationStatus === 'attended') {
+        reservation.attendedAt = new Date().toISOString();
         
-        if (hoursUntil < 2) {
-          // Too late - mark as no_show instead
-          reservation.reservationStatus = 'no_show';
-          console.log(`Cancellation too late (<2hr) - marked as no_show: ${reservationId}`);
-        } else {
-          // Late cancellation (2-24hr) - flag for admin review
-          reservation.reservationStatus = 'cancelled';
-          console.log(`Late cancellation (${hoursUntil.toFixed(1)}hr notice) flagged for review: ${reservationId}`);
-        }
-      } else {
-        // Normal cancellation (>24hr or admin)
-        reservation.reservationStatus = 'cancelled';
-        
-        // Refund session if from package
-        if (reservation.packageId && (hoursUntil >= 24 || cancelledBy === 'admin')) {
+        if (reservation.packageId) {
           const pkg = await kv.get(reservation.packageId);
-          if (pkg) {
-            pkg.remainingSessions++;
-            pkg.sessionsBooked = pkg.sessionsBooked.filter((id: string) => id !== reservationId);
-            pkg.updatedAt = new Date().toISOString();
-            await kv.set(pkg.id, pkg);
-            console.log(`Session credited back to package ${pkg.id}: ${pkg.remainingSessions} sessions remaining`);
+          if (pkg && !pkg.sessionsAttended.includes(reservationId)) {
+            pkg.sessionsAttended.push(reservationId);
+            await kv.set(reservation.packageId, pkg);
           }
         }
       }
-    } else {
-      // Other status changes
-      reservation.reservationStatus = status;
       
-      if (status === 'attended') {
-        reservation.attendedAt = new Date().toISOString();
+      if (reservationStatus === 'cancelled') {
+        reservation.cancelledAt = new Date().toISOString();
+        reservation.cancelReason = cancelReason || 'User cancelled';
         
-        // Add to package sessionsAttended
-        if (reservation.packageId) {
-          const pkg = await kv.get(reservation.packageId);
-          if (pkg) {
-            if (!pkg.sessionsAttended.includes(reservationId)) {
-              pkg.sessionsAttended.push(reservationId);
-              pkg.updatedAt = new Date().toISOString();
-              await kv.set(pkg.id, pkg);
-            }
-          }
+        const sessionTime = new Date(reservation.fullDate);
+        const now = new Date();
+        const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursUntilSession < 24) {
+          reservation.lateCancellation = true;
+        }
+      }
+    }
+
+    if (paymentStatus) {
+      reservation.paymentStatus = paymentStatus;
+      
+      if (reservation.packageId) {
+        const pkg = await kv.get(reservation.packageId);
+        if (pkg) {
+          pkg.paymentStatus = paymentStatus;
+          await kv.set(reservation.packageId, pkg);
         }
       }
     }
@@ -1266,56 +1140,53 @@ app.patch("/make-server-b87b0c07/reservations/:id/status", async (c) => {
     reservation.updatedAt = new Date().toISOString();
     await kv.set(reservationId, reservation);
 
-    console.log(`Reservation ${reservationId} status updated: ${oldStatus} → ${reservation.reservationStatus}`);
+    console.log(`Reservation ${reservationId} status updated`);
 
     return c.json({
       success: true,
       reservation,
-      message: `Reservation ${status === 'cancelled' ? 'cancelled' : 'updated'} successfully`
+      message: 'Reservation updated successfully'
     });
 
   } catch (error) {
-    console.error('Error updating reservation status:', error);
-    return c.json({ error: 'Failed to update reservation status', details: error.message }, 500);
+    console.error('Error updating reservation:', error);
+    return c.json({ error: 'Failed to update reservation', details: error.message }, 500);
   }
 });
 
-// Delete reservation (admin only)
 app.delete("/make-server-b87b0c07/reservations/:id", async (c) => {
   try {
     const reservationId = c.req.param('id');
-    
     const reservation = await kv.get(reservationId);
+    
     if (!reservation) {
       return c.json({ error: 'Reservation not found' }, 404);
     }
 
-    // If linked to package, remove from package
     if (reservation.packageId) {
       const pkg = await kv.get(reservation.packageId);
       if (pkg) {
         pkg.sessionsBooked = pkg.sessionsBooked.filter((id: string) => id !== reservationId);
         pkg.sessionsAttended = pkg.sessionsAttended.filter((id: string) => id !== reservationId);
         
-        // If this was first reservation, clear it
         if (pkg.firstReservationId === reservationId) {
           pkg.firstReservationId = null;
+          pkg.packageStatus = 'pending';
         }
         
-        // Restore session credit if confirmed/attended
-        if (reservation.reservationStatus === 'confirmed' || reservation.reservationStatus === 'attended') {
-          pkg.remainingSessions++;
-        }
-        
+        pkg.remainingSessions = pkg.totalSessions - pkg.sessionsBooked.length;
         pkg.updatedAt = new Date().toISOString();
-        await kv.set(pkg.id, pkg);
+        await kv.set(reservation.packageId, pkg);
       }
     }
 
     await kv.del(reservationId);
     console.log(`Reservation deleted: ${reservationId}`);
 
-    return c.json({ success: true, message: "Reservation deleted successfully" });
+    return c.json({
+      success: true,
+      message: 'Reservation deleted successfully'
+    });
 
   } catch (error) {
     console.error('Error deleting reservation:', error);
@@ -1323,199 +1194,389 @@ app.delete("/make-server-b87b0c07/reservations/:id", async (c) => {
   }
 });
 
-// ============ ACTIVATION ENDPOINT ============
+// ============ ACTIVATION ENDPOINTS ============
 
 app.post("/make-server-b87b0c07/activate", async (c) => {
   try {
     const body = await c.req.json();
-    const { email, code } = body;
+    const { email, activationCode } = body;
 
-    if (!email || !code) {
-      return c.json({ error: "Missing email or activation code" }, 400);
+    if (!email || !activationCode) {
+      return c.json({ error: "Email and activation code are required" }, 400);
     }
 
-    const codeUpper = code.toUpperCase().trim();
-    const codeKey = `activation_code:${codeUpper}`;
+    const normalizedEmail = normalizeEmail(email);
+    const codeKey = `activation_code:${activationCode}`;
+    const activationData = await kv.get(codeKey);
 
-    // Get activation code
-    const activationCode = await kv.get(codeKey);
-    
-    if (!activationCode) {
-      return c.json({ error: "Invalid activation code. Please check the code and try again." }, 400);
+    if (!activationData) {
+      return c.json({ error: "Invalid activation code" }, 400);
     }
 
-    // Validate activation code
-    if (activationCode.status === 'used') {
-      return c.json({ error: "This activation code has already been used and cannot be reused." }, 400);
+    if (activationData.email !== normalizedEmail) {
+      return c.json({ error: "Activation code does not match email" }, 400);
     }
 
-    if (new Date(activationCode.expiresAt) < new Date()) {
-      return c.json({ error: "This activation code has expired. Please contact support." }, 400);
+    if (activationData.status !== 'active') {
+      return c.json({ error: "Activation code has already been used" }, 400);
     }
 
-    if (activationCode.email.toLowerCase() !== email.toLowerCase()) {
-      return c.json({ error: "This activation code is not valid for this email address." }, 400);
+    if (new Date(activationData.expiresAt) < new Date()) {
+      return c.json({ error: "Activation code has expired" }, 400);
     }
 
-    // Determine if this is package or reservation activation
-    if (activationCode.packageId) {
-      // PACKAGE ACTIVATION
-      const pkg = await kv.get(activationCode.packageId);
-      
+    const packageId = activationData.packageId;
+    const reservationId = activationData.reservationId;
+    let activatedItem = null;
+    let itemType = '';
+
+    if (packageId) {
+      const pkg = await kv.get(packageId);
       if (!pkg) {
-        return c.json({ error: "Package not found." }, 404);
+        return c.json({ error: "Package not found" }, 404);
       }
 
-      if (pkg.activationStatus === 'activated') {
-        return c.json({ error: "This package is already activated." }, 400);
-      }
-
-      // CRITICAL: Validate that first session has been booked
-      if (!pkg.firstReservationId) {
-        return c.json({ 
-          error: "Cannot activate package without first session booked. Please complete the booking flow." 
-        }, 400);
-      }
-
-      // Get first reservation
-      const firstReservation = await kv.get(pkg.firstReservationId);
-      if (!firstReservation) {
-        return c.json({ error: "First reservation not found. Please contact support." }, 404);
-      }
-
-      // Activate package
-      const now = new Date().toISOString();
+      pkg.activationDate = new Date().toISOString();
+      pkg.expiryDate = calculateExpiry(pkg.activationDate);
       pkg.packageStatus = 'active';
       pkg.activationStatus = 'activated';
-      pkg.activationDate = now;
-      pkg.expiryDate = calculateExpiry(now);
-      pkg.remainingSessions = pkg.totalSessions - 1; // First session now booked
-      pkg.updatedAt = now;
-      await kv.set(pkg.id, pkg);
+      pkg.updatedAt = new Date().toISOString();
+      await kv.set(packageId, pkg);
 
-      // Confirm first reservation
-      firstReservation.reservationStatus = 'confirmed';
-      firstReservation.activatedAt = now;
-      firstReservation.updatedAt = now;
-      await kv.set(firstReservation.id, firstReservation);
+      if (pkg.firstReservationId) {
+        const firstReservation = await kv.get(pkg.firstReservationId);
+        if (firstReservation) {
+          firstReservation.reservationStatus = 'confirmed';
+          firstReservation.activatedAt = new Date().toISOString();
+          firstReservation.updatedAt = new Date().toISOString();
+          await kv.set(pkg.firstReservationId, firstReservation);
+        }
+      }
 
-      // Mark activation code as used
-      activationCode.status = 'used';
-      activationCode.usedAt = now;
-      await kv.set(codeKey, activationCode);
+      activatedItem = pkg;
+      itemType = 'package';
+      console.log(`Package activated: ${packageId}`);
 
-      console.log(`Package activated: ${pkg.id}`);
-      console.log(`First reservation confirmed: ${firstReservation.id}`);
-      console.log(`Remaining sessions: ${pkg.remainingSessions}`);
-
-      return c.json({
-        success: true,
-        type: 'package',
-        package: pkg,
-        firstReservation,
-        message: "Package activated successfully!"
-      });
-
-    } else if (activationCode.reservationId) {
-      // RESERVATION ACTIVATION (single session)
-      const reservation = await kv.get(activationCode.reservationId);
-      
+    } else if (reservationId) {
+      const reservation = await kv.get(reservationId);
       if (!reservation) {
-        return c.json({ error: "Reservation not found." }, 404);
+        return c.json({ error: "Reservation not found" }, 404);
       }
 
-      if (reservation.reservationStatus === 'confirmed') {
-        return c.json({ error: "This reservation is already confirmed." }, 400);
-      }
-
-      // Confirm reservation
-      const now = new Date().toISOString();
       reservation.reservationStatus = 'confirmed';
-      reservation.activatedAt = now;
-      reservation.updatedAt = now;
-      await kv.set(reservation.id, reservation);
+      reservation.activatedAt = new Date().toISOString();
+      reservation.updatedAt = new Date().toISOString();
+      await kv.set(reservationId, reservation);
 
-      // Mark activation code as used
-      activationCode.status = 'used';
-      activationCode.usedAt = now;
-      await kv.set(codeKey, activationCode);
-
-      console.log(`Reservation confirmed: ${reservation.id}`);
-
-      return c.json({
-        success: true,
-        type: 'reservation',
-        reservation,
-        message: "Reservation confirmed successfully!"
-      });
-
-    } else {
-      return c.json({ error: "Activation code is not linked to any package or reservation." }, 500);
+      activatedItem = reservation;
+      itemType = 'reservation';
+      console.log(`Reservation activated: ${reservationId}`);
     }
 
+    activationData.status = 'used';
+    activationData.usedAt = new Date().toISOString();
+    await kv.set(codeKey, activationData);
+
+    return c.json({
+      success: true,
+      message: `${itemType === 'package' ? 'Package' : 'Reservation'} activated successfully!`,
+      itemType,
+      item: activatedItem
+    });
+
   } catch (error) {
-    console.error('Error during activation:', error);
-    return c.json({ error: 'Failed to activate', details: error.message }, 500);
+    console.error('Error activating:', error);
+    return c.json({ error: 'Activation failed', details: error.message }, 500);
   }
 });
 
-// ============ LEGACY COMPATIBILITY (for gradual migration) ============
+// ============ ADMIN ENDPOINTS ============
 
-// Legacy /bookings endpoint - maps to reservations
-app.get("/make-server-b87b0c07/bookings", async (c) => {
+// Get all users with aggregated package and payment data
+app.get("/make-server-b87b0c07/admin/users", async (c) => {
   try {
-    console.warn('⚠️  Legacy /bookings endpoint called - use /reservations instead');
-    
-    // Return reservations as "bookings" for backwards compatibility
-    const reservations = await kv.getByPrefix('reservation:');
-    
+    const allUsers = await kv.getByPrefix('user:');
+    const allPackages = await kv.getByPrefix('package:');
+    const allReservations = await kv.getByPrefix('reservation:');
+
+    // Build user summary with packages and payment status
+    const userSummaries = allUsers.map((user: any) => {
+      const userEmail = user.email;
+      
+      // Find all packages for this user
+      const userPackages = allPackages.filter((pkg: any) => pkg.userId === userEmail);
+      
+      // Find all reservations for this user
+      const userReservations = allReservations.filter((res: any) => res.userId === userEmail);
+
+      // Determine payment status (paid if any package/reservation has paid status)
+      const hasPaidPackage = userPackages.some((pkg: any) => pkg.paymentStatus === 'paid');
+      const hasPaidReservation = userReservations.some((res: any) => res.paymentStatus === 'paid');
+      const paymentStatus = (hasPaidPackage || hasPaidReservation) ? 'paid' : 'unpaid';
+
+      // Calculate total sessions across all packages
+      const totalSessions = userPackages.reduce((sum: number, pkg: any) => {
+        const sessionCount = parseInt(pkg.packageType.match(/\d+/)?.[0] || '0');
+        return sum + sessionCount;
+      }, 0);
+
+      const usedSessions = userPackages.reduce((sum: number, pkg: any) => {
+        return sum + (pkg.sessionsUsed || 0);
+      }, 0);
+
+      return {
+        id: user.id,
+        name: user.name,
+        surname: user.surname,
+        mobile: user.mobile,
+        email: user.email,
+        paymentStatus, // 'paid' or 'unpaid'
+        packages: userPackages.map((pkg: any) => ({
+          id: pkg.id,
+          type: pkg.packageType,
+          status: pkg.packageStatus,
+          paymentStatus: pkg.paymentStatus,
+          activationStatus: pkg.activationStatus,
+          sessionsUsed: pkg.sessionsUsed || 0,
+          createdAt: pkg.createdAt,
+          activationDate: pkg.activationDate,
+          expiryDate: pkg.expiryDate,
+        })),
+        reservations: userReservations.map((res: any) => ({
+          id: res.id,
+          dateKey: res.dateKey,
+          timeSlot: res.timeSlot,
+          reservationStatus: res.reservationStatus,
+          paymentStatus: res.paymentStatus,
+          createdAt: res.createdAt,
+        })),
+        totalSessions,
+        usedSessions,
+        remainingSessions: totalSessions - usedSessions,
+        createdAt: user.createdAt,
+        blocked: user.blocked || false,
+      };
+    });
+
     return c.json({ 
       success: true, 
-      bookings: reservations,
-      _deprecated: "This endpoint is deprecated. Use /reservations instead."
+      users: userSummaries,
+      total: userSummaries.length,
+      paid: userSummaries.filter(u => u.paymentStatus === 'paid').length,
+      unpaid: userSummaries.filter(u => u.paymentStatus === 'unpaid').length,
     });
+  } catch (error) {
+    console.error('Error fetching admin users:', error);
+    return c.json({ error: 'Failed to fetch users', details: error.message }, 500);
+  }
+});
+
+// Update payment status for a user's package
+app.patch("/make-server-b87b0c07/admin/users/:email/payment", async (c) => {
+  try {
+    const email = c.req.param('email');
+    const body = await c.req.json();
+    const { paymentStatus } = body; // 'paid' or 'unpaid'
+
+    if (!email || !paymentStatus) {
+      return c.json({ error: "Email and paymentStatus are required" }, 400);
+    }
+
+    if (paymentStatus !== 'paid' && paymentStatus !== 'unpaid') {
+      return c.json({ error: "paymentStatus must be 'paid' or 'unpaid'" }, 400);
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    
+    // Update all packages for this user
+    const allPackages = await kv.getByPrefix('package:');
+    const userPackages = allPackages.filter((pkg: any) => pkg.userId === normalizedEmail);
+
+    for (const pkg of userPackages) {
+      pkg.paymentStatus = paymentStatus;
+      pkg.updatedAt = new Date().toISOString();
+      await kv.set(pkg.id, pkg);
+    }
+
+    // Update all reservations for this user
+    const allReservations = await kv.getByPrefix('reservation:');
+    const userReservations = allReservations.filter((res: any) => res.userId === normalizedEmail);
+
+    for (const res of userReservations) {
+      res.paymentStatus = paymentStatus;
+      res.updatedAt = new Date().toISOString();
+      await kv.set(res.id, res);
+    }
+
+    console.log(`Payment status updated to '${paymentStatus}' for user: ${normalizedEmail}`);
+
+    return c.json({
+      success: true,
+      message: `Payment status updated to '${paymentStatus}'`,
+      packagesUpdated: userPackages.length,
+      reservationsUpdated: userReservations.length,
+    });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    return c.json({ error: 'Failed to update payment status', details: error.message }, 500);
+  }
+});
+
+// Resend activation code email for a user
+app.post("/make-server-b87b0c07/admin/resend-activation-code", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { email } = body;
+
+    if (!email) {
+      return c.json({ error: "Email is required" }, 400);
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    
+    // Find user's active activation codes
+    const allActivationCodes = await kv.getByPrefix('activation_code:');
+    const userActivationCodes = allActivationCodes.filter(
+      (code: any) => code.email === normalizedEmail && code.status === 'active'
+    );
+
+    if (userActivationCodes.length === 0) {
+      return c.json({ error: "No active activation codes found for this user" }, 404);
+    }
+
+    // Get the most recent activation code
+    const latestCode = userActivationCodes.sort(
+      (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+
+    // Get the user info
+    const user = await kv.get(`user:${normalizedEmail}`);
+    if (!user) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    // Determine what type of activation code it is
+    let packageType: PackageType = 'single';
+    let firstSessionDetails = null;
+
+    if (latestCode.packageId) {
+      const pkg = await kv.get(latestCode.packageId);
+      if (pkg) {
+        packageType = pkg.packageType;
+        
+        // If there's a first reservation, get those details
+        if (pkg.firstReservationId) {
+          const reservation = await kv.get(pkg.firstReservationId);
+          if (reservation) {
+            const [hours, minutes] = reservation.timeSlot.split(':');
+            const endTime = `${(parseInt(hours) + 1).toString().padStart(2, '0')}:${minutes}`;
+            
+            firstSessionDetails = {
+              date: formatDateString(reservation.dateKey),
+              timeSlot: reservation.timeSlot,
+              endTime,
+              instructor: reservation.instructor,
+            };
+          }
+        }
+      }
+    } else if (latestCode.reservationId) {
+      const reservation = await kv.get(latestCode.reservationId);
+      if (reservation) {
+        const [hours, minutes] = reservation.timeSlot.split(':');
+        const endTime = `${(parseInt(hours) + 1).toString().padStart(2, '0')}:${minutes}`;
+        
+        firstSessionDetails = {
+          date: formatDateString(reservation.dateKey),
+          timeSlot: reservation.timeSlot,
+          endTime,
+          instructor: reservation.instructor,
+        };
+      }
+    }
+
+    // Resend the activation email
+    await sendActivationEmail(
+      normalizedEmail,
+      user.name,
+      user.surname,
+      latestCode.code,
+      packageType,
+      firstSessionDetails
+    );
+
+    console.log(`Activation code resent to: ${normalizedEmail}`);
+
+    return c.json({
+      success: true,
+      message: 'Activation code resent successfully',
+      code: latestCode.code,
+    });
+  } catch (error) {
+    console.error('Error resending activation code:', error);
+    return c.json({ error: 'Failed to resend activation code', details: error.message }, 500);
+  }
+});
+
+// ============ LEGACY ENDPOINTS ============
+
+app.get("/make-server-b87b0c07/bookings", async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    const dateKey = c.req.query('dateKey');
+
+    let reservations = await kv.getByPrefix('reservation:');
+
+    if (userId) {
+      const normalizedEmail = normalizeEmail(userId);
+      reservations = reservations.filter((r: any) => r.userId === normalizedEmail);
+    }
+
+    if (dateKey) {
+      reservations = reservations.filter((r: any) => r.dateKey === dateKey);
+    }
+
+    return c.json({ success: true, bookings: reservations });
   } catch (error) {
     console.error('Error fetching bookings:', error);
     return c.json({ error: 'Failed to fetch bookings', details: error.message }, 500);
   }
 });
 
-// Legacy POST /bookings endpoint - creates account immediately with password
 app.post("/make-server-b87b0c07/bookings", async (c) => {
-  console.log('📝 Legacy /bookings POST endpoint called');
-  
   try {
-    let body;
-    try {
-      body = await c.req.json();
-      console.log('Request body received:', JSON.stringify(body, null, 2));
-    } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
-      return c.json({ error: 'Invalid request body' }, 400);
+    const body = await c.req.json();
+    const { dateKey, timeSlot, instructor, name, surname, email, mobile, password, language } = body;
+
+    if (!dateKey || !timeSlot || !instructor || !name || !surname || !email || !mobile || !password) {
+      return c.json({ error: "Missing required fields" }, 400);
     }
-    
-    const { name, surname, email, mobile, password, date, dateKey, timeSlot, instructor, selectedPackage, language } = body;
-    
-    // Validate required fields
-    if (!email || !password) {
-      console.error('Missing required fields: email or password');
-      return c.json({ error: 'Email and password are required' }, 400);
-    }
-    
+
     if (password.length < 6) {
-      console.error('Password too short');
-      return c.json({ error: 'Password must be at least 6 characters' }, 400);
+      return c.json({ error: "Password must be at least 6 characters" }, 400);
     }
+
+    const normalizedEmail = normalizeEmail(email);
+    const capacity = await calculateSlotCapacity(dateKey, timeSlot);
     
-    console.log(`Creating booking for ${email}, package: ${selectedPackage || 'single session'}`);
-    
-    // Normalize email
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    // Hash password
+    if (capacity.available < 1) {
+      return c.json({ error: "Slot is full" }, 400);
+    }
+
+    const allReservations = await kv.getByPrefix('reservation:');
+    const duplicateBooking = allReservations.find((r: any) => 
+      r.userId === normalizedEmail &&
+      r.dateKey === dateKey &&
+      r.timeSlot === timeSlot &&
+      (r.reservationStatus === 'pending' || r.reservationStatus === 'confirmed')
+    );
+
+    if (duplicateBooking) {
+      return c.json({ error: "You already have a booking at this time" }, 400);
+    }
+
     const passwordHash = await hashPassword(password);
-    
-    // Create or update user account immediately with password
+
     const userKey = `user:${normalizedEmail}`;
     let user = await kv.get(userKey);
     
@@ -1530,276 +1591,100 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         blocked: false,
-        verified: true  // Immediately verified since they set password
+        verified: true
       };
       await kv.set(userKey, user);
-      console.log(`✅ User account created with password: ${normalizedEmail}`);
+      console.log(`User created during booking: ${normalizedEmail}`);
     } else if (!user.passwordHash) {
-      // Update existing user with password
       user.passwordHash = passwordHash;
       user.verified = true;
       user.updatedAt = new Date().toISOString();
       await kv.set(userKey, user);
-      console.log(`✅ Existing user updated with password: ${normalizedEmail}`);
-    } else {
-      // User exists with password - verify password matches
-      const isPasswordValid = await verifyPassword(password, user.passwordHash);
-      if (!isPasswordValid) {
-        console.error(`❌ Invalid password for existing user: ${normalizedEmail}`);
-        return c.json({ 
-          error: 'This email is already registered with a different password. Please enter your correct password or login first.',
-          errorType: 'WRONG_PASSWORD'
-        }, 400);
-      }
-      console.log(`✅ Existing user verified with password: ${normalizedEmail}`);
-      // Update user info if needed
-      user.name = name || user.name;
-      user.surname = surname || user.surname;
-      user.mobile = mobile || user.mobile;
-      user.updatedAt = new Date().toISOString();
-      await kv.set(userKey, user);
+      console.log(`Password set for existing user: ${normalizedEmail}`);
     }
-    
-    // Handle package vs single session
-    if (selectedPackage) {
-      // Package booking - create package and first session
-      const packageType = selectedPackage as PackageType;
-      const totalSessions = extractSessionCount(packageType);
-      const packageId = `package:${normalizedEmail}:${Date.now()}`;
-      
-      const pkg = {
-        id: packageId,
-        userId: normalizedEmail,
-        packageType,
-        totalSessions,
-        remainingSessions: totalSessions - 1, // First session will be booked
-        sessionsBooked: [],
-        sessionsAttended: [],
-        purchaseDate: new Date().toISOString(),
-        activationDate: null,
-        expiryDate: null,
-        packageStatus: 'pending' as PackageStatus,
-        activationStatus: 'pending' as ActivationStatus,
-        paymentStatus: 'unpaid' as PaymentStatus,
-        firstReservationId: null,
-        paymentId: null,
-        activationCodeId: null,
+
+    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
+    const sessionKey = `session:${sessionToken}`;
+    const sessionData = {
+      id: sessionKey,
+      token: sessionToken,
+      email: normalizedEmail,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    };
+    await kv.set(sessionKey, sessionData);
+
+    const dateString = formatDateString(dateKey);
+    const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullDate = constructFullDate(dateKey, timeSlot);
+    const endTime = calculateEndTime(timeSlot);
+
+    const reservation = {
+      id: reservationId,
+      userId: normalizedEmail,
+      packageId: null,
+      sessionNumber: null,
+      serviceType: 'single' as ServiceType,
+      dateKey,
+      date: dateString,
+      fullDate,
+      timeSlot,
+      endTime,
+      instructor,
+      name,
+      surname,
+      email: normalizedEmail,
+      mobile,
+      partnerName: null,
+      partnerSurname: null,
+      reservationStatus: 'confirmed' as ReservationStatus,
+      paymentStatus: 'unpaid' as PaymentStatus,
+      seatsOccupied: 1,
+      isPrivateSession: false,
+      isOverbooked: false,
+      isFirstSessionOfPackage: false,
+      autoConfirmed: true,
+      lateCancellation: false,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      activatedAt: new Date().toISOString(),
+      attendedAt: null,
+      language: language || 'en'
+    };
+
+    await kv.set(reservationId, reservation);
+    console.log(`Booking created and confirmed: ${reservationId}`);
+
+    return c.json({
+      success: true,
+      reservation,
+      session: sessionToken,
+      user: {
+        email: normalizedEmail,
         name,
         surname,
-        email: normalizedEmail,
-        mobile,
-        language: language || 'en',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      await kv.set(packageId, pkg);
-      console.log(`✅ Package created: ${packageId}`);
-      
-      // If package has first session selected, create reservation
-      if (dateKey && timeSlot && timeSlot !== 'package') {
-        const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const fullDate = constructFullDate(dateKey, timeSlot);
-        const endTime = calculateEndTime(timeSlot);
-        const serviceType = extractServiceType(packageType);
-        
-        const reservation = {
-          id: reservationId,
-          userId: normalizedEmail,
-          packageId,
-          sessionNumber: 1,
-          serviceType,
-          dateKey,
-          date,
-          fullDate,
-          timeSlot,
-          endTime,
-          instructor: instructor || 'Rina Krasniqi',
-          name,
-          surname,
-          email: normalizedEmail,
-          mobile,
-          partnerName: null,
-          partnerSurname: null,
-          reservationStatus: 'pending' as ReservationStatus,
-          paymentStatus: 'unpaid' as PaymentStatus,
-          seatsOccupied: serviceType === 'duo' ? 2 : (serviceType === 'individual' ? 4 : 1),
-          isPrivateSession: serviceType === 'individual',
-          isOverbooked: false,
-          isFirstSessionOfPackage: true,
-          autoConfirmed: false,
-          lateCancellation: false,
-          cancelledAt: null,
-          cancelledBy: null,
-          cancelReason: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          activatedAt: null,
-          attendedAt: null,
-          language: language || 'en'
-        };
-        
-        await kv.set(reservationId, reservation);
-        
-        pkg.firstReservationId = reservationId;
-        pkg.sessionsBooked.push(reservationId);
-        await kv.set(packageId, pkg);
-        
-        console.log(`✅ First session reservation created: ${reservationId}`);
-      }
-      
-      // Create session token for auto-login
-      const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
-      const sessionKey = `session:${sessionToken}`;
-      const sessionData = {
-        id: sessionKey,
-        token: sessionToken,
-        email: normalizedEmail,
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-      };
-      await kv.set(sessionKey, sessionData);
-      
-      return c.json({
-        success: true,
-        message: "Account created! You can now login. Admin will send activation code after payment confirmation.",
-        userId: normalizedEmail,
-        package: pkg,
-        session: sessionToken,
-        user: {
-          email: normalizedEmail,
-          name: user.name,
-          surname: user.surname,
-          mobile: user.mobile
-        }
-      });
-      
-    } else {
-      // Single session booking
-      const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const fullDate = constructFullDate(dateKey, timeSlot);
-      const endTime = calculateEndTime(timeSlot);
-      
-      const reservation = {
-        id: reservationId,
-        userId: normalizedEmail,
-        packageId: null,
-        sessionNumber: null,
-        serviceType: 'single' as ServiceType,
-        dateKey,
-        date,
-        fullDate,
-        timeSlot,
-        endTime,
-        instructor: instructor || 'Rina Krasniqi',
-        name,
-        surname,
-        email: normalizedEmail,
-        mobile,
-        partnerName: null,
-        partnerSurname: null,
-        reservationStatus: 'pending' as ReservationStatus,
-        paymentStatus: 'unpaid' as PaymentStatus,
-        seatsOccupied: 1,
-        isPrivateSession: false,
-        isOverbooked: false,
-        isFirstSessionOfPackage: false,
-        autoConfirmed: false,
-        lateCancellation: false,
-        cancelledAt: null,
-        cancelledBy: null,
-        cancelReason: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        activatedAt: null,
-        attendedAt: null,
-        language: language || 'en'
-      };
-      
-      await kv.set(reservationId, reservation);
-      
-      // Generate activation code for single session
-      const activationCode = generateActivationCode();
-      const codeKey = `activation_code:${activationCode}`;
-      const codeExpiry = new Date();
-      codeExpiry.setHours(codeExpiry.getHours() + 24);
-      
-      const activationCodeData = {
-        id: codeKey,
-        code: activationCode,
-        email: normalizedEmail,
-        packageId: null,
-        reservationId,
-        status: 'active',
-        expiresAt: codeExpiry.toISOString(),
-        usedAt: null,
-        createdAt: new Date().toISOString()
-      };
-      
-      await kv.set(codeKey, activationCodeData);
-      
-      console.log(`✅ Single session reservation created: ${reservationId}`);
-      console.log(`✅ Activation code generated: ${activationCode}`);
-      
-      // Create session token for auto-login
-      const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
-      const sessionKey = `session:${sessionToken}`;
-      const sessionData = {
-        id: sessionKey,
-        token: sessionToken,
-        email: normalizedEmail,
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-      };
-      await kv.set(sessionKey, sessionData);
-      
-      return c.json({
-        success: true,
-        message: `Account created! You can login now. Your activation code is: ${activationCode}`,
-        userId: normalizedEmail,
-        reservation,
-        activationCode,
-        session: sessionToken,
-        user: {
-          email: normalizedEmail,
-          name: user.name,
-          surname: user.surname,
-          mobile: user.mobile
-        }
-      });
-    }
-    
+        mobile
+      },
+      message: "Booking confirmed! You are now logged in."
+    });
+
   } catch (error) {
     console.error('Error creating booking:', error);
     return c.json({ error: 'Failed to create booking', details: error.message }, 500);
   }
 });
 
-// Legacy /activate-member endpoint
 app.post("/make-server-b87b0c07/activate-member", async (c) => {
-  console.warn('⚠️  Legacy /activate-member endpoint called - use /activate instead');
-  
-  // Forward to new activation endpoint
-  const body = await c.req.json();
-  const { email, code } = body;
-  
-  // Call the new activation logic
-  const activationResult = await app.fetch(
-    new Request(`${c.req.url.replace('/activate-member', '/activate')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code })
-    })
-  );
-  
-  return activationResult;
+  console.warn('Legacy /activate-member endpoint called - use /activate instead');
+  return c.redirect('/make-server-b87b0c07/activate');
 });
 
 // ============ MIGRATION ENDPOINT ============
 
 app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
-  console.log("🔄 Starting migration from bookings to packages + reservations...");
-  
   const stats = {
     reservations: 0,
     orphanedPackages: 0,
@@ -1809,15 +1694,12 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
   };
   
   try {
-    // Step 1: Get all old bookings
     const oldBookings = await kv.getByPrefix('booking:');
-    console.log(`📦 Found ${oldBookings.length} old bookings to migrate`);
+    console.log(`Found ${oldBookings.length} old bookings to migrate`);
     
-    // Step 2: Migrate bookings with date/time → Reservations
     for (const booking of oldBookings) {
       try {
         if (booking.dateKey && booking.timeSlot) {
-          // Has date/time → create Reservation
           const serviceType = booking.selectedPackage?.includes('individual') ? 'individual' 
                             : booking.selectedPackage?.includes('duo') ? 'duo'
                             : booking.selectedPackage ? 'package' 
@@ -1825,8 +1707,8 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
           
           const reservation = {
             id: `reservation:${booking.id.replace('booking:', '')}`,
-            userId: booking.email,
-            packageId: null, // will link later
+            userId: normalizeEmail(booking.email),
+            packageId: null,
             serviceType,
             sessionNumber: null,
             dateKey: booking.dateKey,
@@ -1837,7 +1719,7 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
             instructor: booking.instructor || 'Rina Krasniqi',
             name: booking.name,
             surname: booking.surname,
-            email: booking.email,
+            email: normalizeEmail(booking.email),
             mobile: booking.mobile,
             partnerName: null,
             partnerSurname: null,
@@ -1861,11 +1743,9 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
           
           await kv.set(reservation.id, reservation);
           stats.reservations++;
-          console.log(`  ✓ Migrated booking → reservation: ${reservation.id}`);
         } 
         else if (booking.selectedPackage) {
-          // Has package but NO date/time → create orphaned Package
-          const packageType = booking.selectedPackage.includes('4') ? 'package4'
+          const packageType = booking.selectedPackage.includes('10') ? 'package10'
                            : booking.selectedPackage.includes('8') ? 'package8'
                            : booking.selectedPackage.includes('12') ? 'package12'
                            : booking.selectedPackage.includes('individual1') ? 'individual1'
@@ -1874,13 +1754,14 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
                            : booking.selectedPackage.includes('duo1') ? 'duo1'
                            : booking.selectedPackage.includes('duo8') ? 'duo8'
                            : booking.selectedPackage.includes('duo12') ? 'duo12'
-                           : 'package4';
+                           : 'package8';
           
           const totalSessions = extractSessionCount(packageType);
+          const normalizedEmail = normalizeEmail(booking.email);
           
           const pkg = {
-            id: `package:${booking.email}:${Date.parse(booking.createdAt)}`,
-            userId: booking.email,
+            id: `package:${normalizedEmail}:${Date.parse(booking.createdAt)}`,
+            userId: normalizedEmail,
             packageType,
             totalSessions,
             remainingSessions: totalSessions,
@@ -1894,33 +1775,29 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
                           : 'pending') as PackageStatus,
             activationStatus: (booking.status === 'confirmed' ? 'activated' : 'pending') as ActivationStatus,
             paymentStatus: 'unpaid' as PaymentStatus,
-            firstReservationId: null, // ORPHANED
+            firstReservationId: null,
             paymentId: null,
             activationCodeId: null,
             name: booking.name,
             surname: booking.surname,
             mobile: booking.mobile,
-            email: booking.email,
+            email: normalizedEmail,
             language: booking.language || 'en',
             createdAt: booking.createdAt,
             updatedAt: booking.updatedAt || booking.createdAt
           };
           
           await kv.set(pkg.id, pkg);
-          await kv.set(`orphaned_package:${pkg.id}`, {userId: booking.email});
+          await kv.set(`orphaned_package:${pkg.id}`, {userId: normalizedEmail});
           stats.orphanedPackages++;
-          console.log(`  ⚠️  Migrated booking → orphaned package: ${pkg.id}`);
         }
       } catch (error) {
-        console.error(`  ❌ Error migrating booking ${booking.id}:`, error);
+        console.error(`Error migrating booking ${booking.id}:`, error);
         stats.errors.push(`Booking ${booking.id}: ${error.message}`);
       }
     }
     
-    console.log(`\n📊 Migration complete!`);
-    console.log(`  Reservations created: ${stats.reservations}`);
-    console.log(`  Orphaned packages: ${stats.orphanedPackages}`);
-    console.log(`  Errors: ${stats.errors.length}`);
+    console.log(`Migration complete: ${stats.reservations} reservations, ${stats.orphanedPackages} orphaned packages`);
     
     return c.json({ 
       success: true, 
@@ -1929,15 +1806,14 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
     });
     
   } catch (error) {
-    console.error("❌ Migration error:", error);
+    console.error("Migration error:", error);
     stats.errors.push(error.message);
     return c.json({ success: false, stats, error: error.message }, 500);
   }
 });
 
-// ============ ADMIN UTILITIES ============
+// ============ ADMIN ENDPOINTS ============
 
-// Get orphaned packages
 app.get("/make-server-b87b0c07/admin/orphaned-packages", async (c) => {
   try {
     const orphanedKeys = await kv.getByPrefix('orphaned_package:');
@@ -1958,7 +1834,6 @@ app.get("/make-server-b87b0c07/admin/orphaned-packages", async (c) => {
   }
 });
 
-// Get calendar view
 app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
   try {
     const dateKey = c.req.query('dateKey');
@@ -1967,14 +1842,10 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
       return c.json({ error: "dateKey parameter required" }, 400);
     }
 
-    // Get all reservations for this date
     const allReservations = await kv.getByPrefix('reservation:');
     const dateReservations = allReservations.filter((r: any) => r.dateKey === dateKey);
-
-    // Standard time slots
-    const timeSlots = ['08:00', '09:00', '10:00', '11:00', '16:00', '17:00', '18:00'];
     
-    const calendarData = await Promise.all(timeSlots.map(async (timeSlot) => {
+    const calendarData = await Promise.all(TIME_SLOTS.map(async (timeSlot) => {
       const slotReservations = dateReservations.filter((r: any) => 
         r.timeSlot === timeSlot &&
         (r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
@@ -2001,204 +1872,77 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
   }
 });
 
-// ============ DEV UTILITIES ============
+// ============ DEV ENDPOINTS ============
 
-// Clear all data (dev only)
 app.post("/make-server-b87b0c07/dev/clear-all-data", async (c) => {
   try {
-    console.log('🗑️  Clearing all data...');
+    const prefixes = ['user:', 'package:', 'reservation:', 'activation_code:', 'verification_token:', 'session:', 'orphaned_package:', 'booking:', 'payment:'];
     
-    // Get all keys
-    const allReservations = await kv.getByPrefix('reservation:');
-    const allPackages = await kv.getByPrefix('package:');
-    const allActivationCodes = await kv.getByPrefix('activation_code:');
-    const allOrphanedPackages = await kv.getByPrefix('orphaned_package:');
-    const allBookings = await kv.getByPrefix('booking:'); // Legacy
-    const allMembers = await kv.getByPrefix('member:'); // Legacy
-    
-    let deletedCount = 0;
-    
-    // Delete reservations
-    for (const item of allReservations) {
-      await kv.del(item.id);
-      deletedCount++;
-    }
-    
-    // Delete packages
-    for (const item of allPackages) {
-      await kv.del(item.id);
-      deletedCount++;
-    }
-    
-    // Delete activation codes
-    for (const item of allActivationCodes) {
-      await kv.del(item.id);
-      deletedCount++;
-    }
-    
-    // Delete orphaned package markers
-    for (const item of allOrphanedPackages) {
-      await kv.del(item.id);
-      deletedCount++;
-    }
-    
-    // Delete legacy bookings
-    for (const item of allBookings) {
-      await kv.del(item.id);
-      deletedCount++;
-    }
-    
-    // Delete legacy members
-    for (const item of allMembers) {
-      await kv.del(item.id);
-      deletedCount++;
-    }
-    
-    console.log(`✅ Cleared ${deletedCount} items from database`);
-    
-    return c.json({ 
-      success: true, 
-      cleared: {
-        reservations: allReservations.length,
-        packages: allPackages.length,
-        activationCodes: allActivationCodes.length,
-        orphanedPackages: allOrphanedPackages.length,
-        bookings: allBookings.length,
-        members: allMembers.length,
-        total: deletedCount
-      },
-      message: 'All data cleared successfully'
-    });
-    
-  } catch (error) {
-    console.error('❌ Error clearing data:', error);
-    return c.json({ 
-      success: false, 
-      error: 'Failed to clear data', 
-      details: error.message 
-    }, 500);
-  }
-});
-
-// Generate mock data (dev only)
-app.post("/make-server-b87b0c07/dev/generate-mock-data", async (c) => {
-  try {
-    console.log('🎲 Generating mock data...');
-    
-    // Mock names
-    const firstNames = ['Ana', 'Marija', 'Elena', 'Katerina', 'Jovana', 'Milica', 'Aleksandra', 'Tamara', 'Ivana', 'Natasha', 
-                        'Stefan', 'Nikola', 'Aleksandar', 'Marko', 'Dejan', 'Ivan', 'Lazar', 'Filip', 'Bojan', 'Goran'];
-    const lastNames = ['Petrovska', 'Nikolovska', 'Stojanovski', 'Dimitrievski', 'Todorovska', 'Kostovski', 'Trajkovski', 
-                       'Angelovska', 'Gligorovski', 'Janeva', 'Ristovski', 'Mitrevski', 'Ilievska', 'Georgievski'];
-    
-    const stats = {
-      users: 0,
-      bookings: 0,
-      reservations: 0,
-      packages: 0,
-      dateRange: 'Jan 23 - Feb 28, 2026',
-      weekdays: 0
-    };
-    
-    // Generate 100 users with bookings
-    for (let i = 0; i < 100; i++) {
-      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@example.com`;
-      const mobile = `+389 7${Math.floor(Math.random() * 10)} ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 900 + 100)}`;
-      
-      stats.users++;
-      
-      // Generate 2-4 bookings per user
-      const bookingCount = Math.floor(Math.random() * 3) + 2;
-      
-      for (let j = 0; j < bookingCount; j++) {
-        // Random date between Jan 23 and Feb 28 (weekdays only)
-        const month = Math.random() < 0.3 ? 1 : 2; // 30% Jan, 70% Feb
-        const maxDay = month === 1 ? 31 : 28;
-        let day = Math.floor(Math.random() * maxDay) + 1;
-        
-        // Skip weekends (for Jan: 25-26, Feb: 1-2, 8-9, 15-16, 22-23)
-        const dateObj = new Date(2026, month - 1, day);
-        const dayOfWeek = dateObj.getDay();
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-          // Skip to next weekday
-          day = (day + 2) % maxDay;
-          if (day === 0) day = 1;
-        }
-        
-        const dateKey = `${month}-${day}`;
-        const timeSlots = ['09:00', '10:00', '11:00', '12:00', '17:00', '18:00', '19:00', '20:00'];
-        const timeSlot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
-        const instructors = ['Rina Krasniqi', 'Viki Stojanovska'];
-        const instructor = instructors[Math.floor(Math.random() * instructors.length)];
-        
-        // Randomly choose service type
-        const serviceTypes = ['single', 'package', 'individual', 'duo'];
-        const serviceType = serviceTypes[Math.floor(Math.random() * serviceTypes.length)] as ServiceType;
-        
-        // Create reservation (simplified for mock data)
-        const reservationId = `reservation:${email}:${Date.now() + j}`;
-        const reservation = {
-          id: reservationId,
-          userId: email,
-          packageId: serviceType !== 'single' ? `package:${email}:mock` : null,
-          serviceType,
-          packageType: serviceType === 'single' ? 'single' : 
-                       serviceType === 'package' ? 'package8' :
-                       serviceType === 'individual' ? 'individual8' : 'duo8',
-          dateKey,
-          timeSlot,
-          instructor,
-          date: dateObj.toISOString().split('T')[0],
-          month,
-          day,
-          status: 'confirmed' as ReservationStatus,
-          paymentStatus: 'paid' as PaymentStatus,
-          name: firstName,
-          surname: lastName,
-          email,
-          mobile,
-          language: 'en',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          confirmedAt: new Date().toISOString(),
-          sessionNumber: serviceType !== 'single' ? Math.floor(Math.random() * 8) + 1 : null,
-          cancellationReason: null,
-          cancelledBy: null,
-          cancelledAt: null
-        };
-        
-        await kv.set(reservationId, reservation);
-        stats.reservations++;
-        stats.bookings++;
+    let totalDeleted = 0;
+    for (const prefix of prefixes) {
+      const items = await kv.getByPrefix(prefix);
+      for (const item of items) {
+        await kv.del(item.id);
+        totalDeleted++;
       }
     }
     
-    // Count unique weekdays
-    stats.weekdays = 37; // Approximate weekdays between Jan 23 - Feb 28
+    console.log(`Cleared ${totalDeleted} items from database`);
     
-    console.log(`✅ Generated ${stats.users} users with ${stats.bookings} bookings`);
-    
-    return c.json({
-      success: true,
-      stats,
-      message: 'Mock data generated successfully'
-    });
-    
-  } catch (error) {
-    console.error('❌ Error generating mock data:', error);
     return c.json({ 
-      success: false, 
-      error: 'Failed to generate mock data', 
-      details: error.message 
-    }, 500);
+      success: true, 
+      message: `Successfully cleared ${totalDeleted} items from all tables`,
+      itemsDeleted: totalDeleted
+    });
+  } catch (error) {
+    console.error('Error clearing data:', error);
+    return c.json({ error: 'Failed to clear data', details: error.message }, 500);
   }
 });
 
-// ============ AUTHENTICATION ENDPOINTS ============
+app.post("/make-server-b87b0c07/dev/generate-mock-data", async (c) => {
+  try {
+    const mockPassword = await hashPassword('password123');
+    const testUsers = [
+      { email: 'test1@example.com', name: 'John', surname: 'Doe', mobile: '+38970123456' },
+      { email: 'test2@example.com', name: 'Jane', surname: 'Smith', mobile: '+38970234567' },
+    ];
 
-// Setup password (complete registration)
+    for (const userData of testUsers) {
+      const normalizedEmail = normalizeEmail(userData.email);
+      const userKey = `user:${normalizedEmail}`;
+      
+      const user = {
+        id: userKey,
+        email: normalizedEmail,
+        name: userData.name,
+        surname: userData.surname,
+        mobile: userData.mobile,
+        passwordHash: mockPassword,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        blocked: false,
+        verified: true
+      };
+      
+      await kv.set(userKey, user);
+    }
+    
+    console.log('Mock data generated');
+    
+    return c.json({
+      success: true,
+      message: 'Mock data generated successfully',
+      users: testUsers.map(u => ({ email: u.email, password: 'password123' }))
+    });
+  } catch (error) {
+    console.error('Error generating mock data:', error);
+    return c.json({ error: 'Failed to generate mock data', details: error.message }, 500);
+  }
+});
+
+// ============ AUTH ENDPOINTS ============
+
 app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
   try {
     const body = await c.req.json();
@@ -2212,7 +1956,6 @@ app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
       return c.json({ error: "Password must be at least 6 characters" }, 400);
     }
 
-    // Get verification token
     const tokenKey = `verification_token:${token}`;
     const tokenData = await kv.get(tokenKey);
 
@@ -2228,8 +1971,8 @@ app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
       return c.json({ error: "This registration link has expired. Please contact support." }, 400);
     }
 
-    // Get user
-    const userKey = `user:${tokenData.email}`;
+    const normalizedEmail = normalizeEmail(tokenData.email);
+    const userKey = `user:${normalizedEmail}`;
     const user = await kv.get(userKey);
 
     if (!user) {
@@ -2240,41 +1983,37 @@ app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
       return c.json({ error: "Password already set. Please log in instead." }, 400);
     }
 
-    // Hash password (simple hash - in production use bcrypt)
     const passwordHash = await hashPassword(password);
 
-    // Update user
     user.passwordHash = passwordHash;
     user.verified = true;
     user.verificationToken = null;
     user.updatedAt = new Date().toISOString();
     await kv.set(userKey, user);
 
-    // Mark token as used
     tokenData.used = true;
     tokenData.usedAt = new Date().toISOString();
     await kv.set(tokenKey, tokenData);
 
-    // Create session token
     const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
     const sessionKey = `session:${sessionToken}`;
     const sessionData = {
       id: sessionKey,
       token: sessionToken,
-      email: user.email,
+      email: normalizedEmail,
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
     await kv.set(sessionKey, sessionData);
 
-    console.log(`✅ Password set for user: ${user.email}`);
+    console.log(`Password set for user: ${normalizedEmail}`);
 
     return c.json({
       success: true,
       message: "Registration complete! You can now log in.",
       session: sessionToken,
       user: {
-        email: user.email,
+        email: normalizedEmail,
         name: user.name,
         surname: user.surname
       }
@@ -2286,52 +2025,32 @@ app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
   }
 });
 
-// Register - create user account without booking
 app.post("/make-server-b87b0c07/auth/register", async (c) => {
-  console.log('📝 /auth/register endpoint called');
-  
   try {
-    let body;
-    try {
-      body = await c.req.json();
-      console.log('Registration request received:', { email: body.email, name: body.name });
-    } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
-      return c.json({ error: 'Invalid request body' }, 400);
-    }
-    
+    const body = await c.req.json();
     const { email, password, name, surname, mobile } = body;
     
-    // Validate required fields
     if (!email || !password) {
-      console.error('Missing required fields: email or password');
       return c.json({ error: 'Email and password are required' }, 400);
     }
     
     if (password.length < 6) {
-      console.error('Password too short');
       return c.json({ error: 'Password must be at least 6 characters' }, 400);
     }
     
-    // Normalize email
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    // Check if user already exists
+    const normalizedEmail = normalizeEmail(email);
     const userKey = `user:${normalizedEmail}`;
     const existingUser = await kv.get(userKey);
     
     if (existingUser && existingUser.passwordHash) {
-      console.log(`ℹ️  Registration attempt for existing user: ${normalizedEmail} - Directing to login`);
       return c.json({ 
         error: 'An account with this email already exists. Please use the login form instead.',
         errorType: 'USER_EXISTS'
       }, 400);
     }
     
-    // Hash password
     const passwordHash = await hashPassword(password);
     
-    // Create user account
     const user = {
       id: userKey,
       email: normalizedEmail,
@@ -2342,11 +2061,11 @@ app.post("/make-server-b87b0c07/auth/register", async (c) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       blocked: false,
-      verified: true  // Immediately verified since they set password
+      verified: true
     };
     
     await kv.set(userKey, user);
-    console.log(`✅ User account created: ${normalizedEmail}`);
+    console.log(`User account created: ${normalizedEmail}`);
     
     return c.json({
       success: true,
@@ -2364,7 +2083,6 @@ app.post("/make-server-b87b0c07/auth/register", async (c) => {
   }
 });
 
-// Login
 app.post("/make-server-b87b0c07/auth/login", async (c) => {
   try {
     const body = await c.req.json();
@@ -2374,8 +2092,8 @@ app.post("/make-server-b87b0c07/auth/login", async (c) => {
       return c.json({ error: "Email and password are required" }, 400);
     }
 
-    // Get user
-    const userKey = `user:${email.toLowerCase()}`;
+    const normalizedEmail = normalizeEmail(email);
+    const userKey = `user:${normalizedEmail}`;
     const user = await kv.get(userKey);
 
     if (!user) {
@@ -2390,32 +2108,30 @@ app.post("/make-server-b87b0c07/auth/login", async (c) => {
       return c.json({ error: "Please complete your registration first. Check your email for the registration link." }, 401);
     }
 
-    // Verify password
     const isValidPassword = await verifyPassword(password, user.passwordHash);
     if (!isValidPassword) {
       return c.json({ error: "Invalid email or password" }, 401);
     }
 
-    // Create session token
     const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
     const sessionKey = `session:${sessionToken}`;
     const sessionData = {
       id: sessionKey,
       token: sessionToken,
-      email: user.email,
+      email: normalizedEmail,
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
     await kv.set(sessionKey, sessionData);
 
-    console.log(`✅ User logged in: ${user.email}`);
+    console.log(`User logged in: ${normalizedEmail}`);
 
     return c.json({
       success: true,
       message: "Login successful",
       session: sessionToken,
       user: {
-        email: user.email,
+        email: normalizedEmail,
         name: user.name,
         surname: user.surname,
         mobile: user.mobile
@@ -2428,7 +2144,6 @@ app.post("/make-server-b87b0c07/auth/login", async (c) => {
   }
 });
 
-// Verify session
 app.get("/make-server-b87b0c07/auth/verify", async (c) => {
   try {
     const sessionToken = c.req.header('X-Session-Token');
@@ -2448,7 +2163,6 @@ app.get("/make-server-b87b0c07/auth/verify", async (c) => {
       return c.json({ error: "Session expired" }, 401);
     }
 
-    // Get user
     const userKey = `user:${session.email}`;
     const user = await kv.get(userKey);
 
@@ -2472,7 +2186,6 @@ app.get("/make-server-b87b0c07/auth/verify", async (c) => {
   }
 });
 
-// Logout
 app.post("/make-server-b87b0c07/auth/logout", async (c) => {
   try {
     const sessionToken = c.req.header('X-Session-Token');
@@ -2480,7 +2193,7 @@ app.post("/make-server-b87b0c07/auth/logout", async (c) => {
     if (sessionToken) {
       const sessionKey = `session:${sessionToken}`;
       await kv.del(sessionKey);
-      console.log(`✅ User logged out`);
+      console.log(`User logged out`);
     }
 
     return c.json({ success: true, message: "Logged out successfully" });
@@ -2491,7 +2204,8 @@ app.post("/make-server-b87b0c07/auth/logout", async (c) => {
   }
 });
 
-// Get user's packages and bookings
+// ============ USER ENDPOINTS ============
+
 app.get("/make-server-b87b0c07/user/packages", async (c) => {
   try {
     const sessionToken = c.req.header('X-Session-Token');
@@ -2500,224 +2214,102 @@ app.get("/make-server-b87b0c07/user/packages", async (c) => {
       return c.json({ error: "No session token provided" }, 401);
     }
 
-    // Verify session
     const sessionKey = `session:${sessionToken}`;
     const session = await kv.get(sessionKey);
 
-    if (!session) {
-      return c.json({ error: "Invalid session" }, 401);
+    if (!session || new Date(session.expiresAt) < new Date()) {
+      return c.json({ error: "Invalid or expired session" }, 401);
     }
 
-    if (new Date(session.expiresAt) < new Date()) {
-      return c.json({ error: "Session expired" }, 401);
-    }
-
-    const userEmail = session.email;
-
-    // Get all packages for this user
-    const allPackages = await kv.getByPrefix('package:');
-    const userPackages = allPackages.filter((pkg: any) => pkg.email === userEmail);
-
-    // For each package, get the first session reservation details
-    const packagesWithDetails = await Promise.all(
-      userPackages.map(async (pkg: any) => {
-        let firstSessionDetails = null;
-
-        if (pkg.firstReservationId) {
-          const reservation = await kv.get(pkg.firstReservationId);
-          if (reservation) {
-            firstSessionDetails = {
-              id: reservation.id,
-              date: reservation.date,
-              dateKey: reservation.dateKey,
-              time: reservation.time,
-              endTime: reservation.endTime,
-              instructor: reservation.instructor,
-            };
-          }
-        }
-
-        return {
-          id: pkg.id,
-          packageType: pkg.packageType,
-          packageStatus: pkg.packageStatus, // 'pending' or 'active'
-          totalSessions: pkg.totalSessions,
-          remainingSessions: pkg.remainingSessions,
-          sessionsBooked: pkg.sessionsBooked || [],
-          firstSession: firstSessionDetails,
-          createdAt: pkg.createdAt,
-          activationCodeId: pkg.activationCodeId,
-        };
-      })
-    );
+    const allPackages = await kv.getByPrefix(`package:${session.email}:`);
+    const allReservations = await kv.getByPrefix('reservation:');
+    const userReservations = allReservations.filter((r: any) => r.userId === session.email);
 
     return c.json({
       success: true,
-      packages: packagesWithDetails,
+      packages: allPackages,
+      reservations: userReservations
     });
 
   } catch (error) {
-    console.error('Error getting user packages:', error);
-    return c.json({ error: 'Failed to get packages', details: error.message }, 500);
+    console.error('Error fetching user packages:', error);
+    return c.json({ error: 'Failed to fetch packages', details: error.message }, 500);
   }
 });
 
-// Reschedule first session (only if >24h before class)
 app.post("/make-server-b87b0c07/user/packages/:id/reschedule", async (c) => {
   try {
-    const sessionToken = c.req.header('X-Session-Token');
-
-    if (!sessionToken) {
-      return c.json({ error: "No session token provided" }, 401);
-    }
-
-    // Verify session
-    const sessionKey = `session:${sessionToken}`;
-    const session = await kv.get(sessionKey);
-
-    if (!session) {
-      return c.json({ error: "Invalid session" }, 401);
-    }
-
-    if (new Date(session.expiresAt) < new Date()) {
-      return c.json({ error: "Session expired" }, 401);
-    }
-
     const packageId = c.req.param('id');
     const body = await c.req.json();
-    const { dateKey, timeSlot } = body;
+    const { dateKey, timeSlot, instructor } = body;
 
-    if (!dateKey || !timeSlot) {
-      return c.json({ error: "Missing required fields: dateKey, timeSlot" }, 400);
+    if (!dateKey || !timeSlot || !instructor) {
+      return c.json({ error: "Missing required fields" }, 400);
     }
 
-    // Get package
     const pkg = await kv.get(packageId);
     if (!pkg) {
       return c.json({ error: "Package not found" }, 404);
     }
 
-    // Verify user owns this package
-    if (pkg.email !== session.email) {
-      return c.json({ error: "Unauthorized - package belongs to different user" }, 403);
-    }
-
-    // Get current first reservation
     if (!pkg.firstReservationId) {
-      return c.json({ error: "No first session booked yet" }, 400);
+      return c.json({ error: "No first session to reschedule" }, 400);
     }
 
-    const oldReservation = await kv.get(pkg.firstReservationId);
-    if (!oldReservation) {
-      return c.json({ error: "Current reservation not found" }, 404);
+    const firstReservation = await kv.get(pkg.firstReservationId);
+    if (!firstReservation) {
+      return c.json({ error: "First session not found" }, 404);
     }
 
-    // Check if >24 hours before class
-    const classDateTime = new Date(`${oldReservation.date}T${oldReservation.time}`);
+    const sessionTime = new Date(firstReservation.fullDate);
     const now = new Date();
-    const hoursUntilClass = (classDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursUntilClass < 24) {
-      return c.json({ 
-        error: "Cannot reschedule within 24 hours of class time",
-        hoursUntilClass: Math.round(hoursUntilClass * 10) / 10
-      }, 400);
+    if (hoursUntilSession < 24) {
+      return c.json({ error: "Cannot reschedule less than 24 hours before the session" }, 400);
     }
 
-    // Extract service type
     const serviceType = extractServiceType(pkg.packageType);
-
-    // Check new slot availability
     const capacity = await calculateSlotCapacity(dateKey, timeSlot);
-    
-    if (serviceType === 'individual') {
-      if (capacity.available < 4) {
-        return c.json({ error: "New slot not available for 1-on-1 session" }, 400);
-      }
-    } else if (serviceType === 'duo') {
-      if (capacity.available < 2) {
-        return c.json({ error: "New slot does not have enough space for DUO" }, 400);
-      }
-    } else {
-      if (capacity.available < 1) {
-        return c.json({ error: "New slot is full" }, 400);
-      }
+
+    if (serviceType === 'individual' && capacity.available < 4) {
+      return c.json({ error: "Slot not available for 1-on-1 session" }, 400);
+    } else if (serviceType === 'duo' && capacity.available < 2) {
+      return c.json({ error: "Slot not available for DUO session" }, 400);
+    } else if (capacity.available < 1) {
+      return c.json({ error: "Slot is full" }, 400);
     }
 
-    // Delete old reservation (free up the slot)
-    await kv.del(pkg.firstReservationId);
-
-    // Create new reservation
+    const dateString = formatDateString(dateKey);
+    const fullDate = constructFullDate(dateKey, timeSlot);
     const endTime = calculateEndTime(timeSlot);
-    const dateObj = new Date(dateKey);
-    const dateString = formatDateForDisplay(dateObj);
-    
-    const newReservationId = `reservation:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newReservation = {
-      id: newReservationId,
-      packageId: pkg.id,
-      email: pkg.email,
-      name: pkg.name,
-      surname: pkg.surname,
-      mobile: pkg.mobile,
-      date: dateString,
-      dateKey: dateKey,
-      time: timeSlot,
-      endTime: endTime,
-      instructor: oldReservation.instructor || 'Rina Krasniqi',
-      packageType: pkg.packageType,
-      createdAt: new Date().toISOString(),
-      sessionNumber: 1,
-    };
 
-    await kv.set(newReservationId, newReservation);
+    firstReservation.dateKey = dateKey;
+    firstReservation.date = dateString;
+    firstReservation.fullDate = fullDate;
+    firstReservation.timeSlot = timeSlot;
+    firstReservation.endTime = endTime;
+    firstReservation.instructor = instructor;
+    firstReservation.updatedAt = new Date().toISOString();
 
-    // Update package with new reservation ID
-    pkg.firstReservationId = newReservationId;
-    pkg.sessionsBooked = [newReservationId];
-    pkg.updatedAt = new Date().toISOString();
-    await kv.set(packageId, pkg);
+    await kv.set(pkg.firstReservationId, firstReservation);
 
-    console.log(`✅ Rescheduled first session for ${packageId}`);
-    console.log(`   Old: ${oldReservation.date} at ${oldReservation.time}`);
-    console.log(`   New: ${dateString} at ${timeSlot}`);
+    console.log(`Rescheduled first session for package ${packageId}`);
 
     return c.json({
       success: true,
-      message: "First session rescheduled successfully",
-      newReservation: {
-        date: dateString,
-        dateKey: dateKey,
-        time: timeSlot,
-        endTime: endTime,
-      },
+      message: "Session rescheduled successfully",
+      reservation: firstReservation
     });
 
   } catch (error) {
     console.error('Error rescheduling session:', error);
-    return c.json({ error: 'Failed to reschedule', details: error.message }, 500);
+    return c.json({ error: 'Failed to reschedule session', details: error.message }, 500);
   }
 });
 
-// Helper functions for password hashing
-async function hashPassword(password: string): Promise<string> {
-  // Simple hash - in production use bcrypt or similar
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
-}
-
 // ============ DEBUG ENDPOINT ============
 
-// Debug endpoint to check if users exist
 app.get("/make-server-b87b0c07/debug/check-users", async (c) => {
   try {
     const allUsers = await kv.getByPrefix('user:');
@@ -2736,6 +2328,767 @@ app.get("/make-server-b87b0c07/debug/check-users", async (c) => {
   } catch (error) {
     console.error('Error checking users:', error);
     return c.json({ error: 'Failed to check users', details: error.message }, 500);
+  }
+});
+
+// ============ WAITLIST ENDPOINTS ============
+
+// Add user to waitlist
+app.post("/make-server-b87b0c07/waitlist", async (c) => {
+  try {
+    const { name, surname, mobile, email } = await c.req.json();
+    
+    if (!name || !surname || !mobile || !email) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const waitlistId = `waitlist:${normalizedEmail}`;
+    
+    // Check if already in waitlist
+    const existing = await kv.get(waitlistId);
+    if (existing) {
+      return c.json({ error: 'Already in waitlist' }, 400);
+    }
+
+    // Generate unique redemption code
+    const redemptionCode = `WL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    
+    const waitlistUser = {
+      id: waitlistId,
+      name,
+      surname,
+      mobile,
+      email: normalizedEmail,
+      redemptionCode,
+      status: 'pending', // pending, invited, redeemed
+      addedAt: new Date().toISOString(),
+      invitedAt: null,
+      redeemedAt: null,
+      inviteEmailSent: false
+    };
+
+    await kv.set(waitlistId, waitlistUser);
+    console.log(`✅ Added user to waitlist: ${normalizedEmail}`);
+
+    return c.json({ success: true, waitlistUser });
+  } catch (error) {
+    console.error('Error adding to waitlist:', error);
+    return c.json({ error: 'Failed to add to waitlist', details: error.message }, 500);
+  }
+});
+
+// Get all waitlist users (admin only)
+app.get("/make-server-b87b0c07/admin/waitlist", async (c) => {
+  try {
+    const waitlistUsers = await kv.getByPrefix('waitlist:');
+    
+    // Sort by addedAt date (newest first)
+    waitlistUsers.sort((a, b) => {
+      const dateA = new Date(a.addedAt || 0).getTime();
+      const dateB = new Date(b.addedAt || 0).getTime();
+      return dateB - dateA;
+    });
+
+    console.log(`📋 Retrieved ${waitlistUsers.length} waitlist users`);
+    
+    return c.json({ success: true, users: waitlistUsers });
+  } catch (error) {
+    console.error('Error fetching waitlist:', error);
+    return c.json({ error: 'Failed to fetch waitlist', details: error.message }, 500);
+  }
+});
+
+// Send invite email to waitlist user(s)
+app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
+  try {
+    const { emails, bulk = false } = await c.req.json();
+    
+    if (!emails || (Array.isArray(emails) && emails.length === 0)) {
+      return c.json({ error: 'No emails provided' }, 400);
+    }
+
+    const emailList = Array.isArray(emails) ? emails : [emails];
+    const results = [];
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+
+    if (!resendApiKey) {
+      return c.json({ error: 'Email service not configured' }, 500);
+    }
+
+    for (const email of emailList) {
+      const normalizedEmail = email.toLowerCase().trim();
+      const waitlistId = `waitlist:${normalizedEmail}`;
+      
+      const waitlistUser = await kv.get(waitlistId);
+      
+      if (!waitlistUser) {
+        results.push({ email, success: false, error: 'Not found in waitlist' });
+        continue;
+      }
+
+      // Detect language based on name/surname
+      const detectLanguage = (name: string, surname: string): 'sq' | 'mk' | 'en' => {
+        const fullName = `${name} ${surname}`.toLowerCase();
+        
+        // Albanian name patterns and common names
+        const albanianPatterns = ['besa', 'arben', 'enkeleda', 'besim', 'alban', 'driton', 'erjon', 'flamur', 'gent'];
+        const albanianEndings = ['aj', 'ush', 'ues'];
+        
+        // Macedonian name patterns and common names
+        const macedonianPatterns = ['aleksandar', 'dimitrije', 'nikola', 'stefan', 'marija', 'elena', 'jovana', 'darko'];
+        const macedonianEndings = ['ski', 'ovski', 'evski', 'ov', 'ova', 'ev', 'eva', 'ić', 'ič'];
+        
+        // Check for Albanian patterns
+        for (const pattern of albanianPatterns) {
+          if (fullName.includes(pattern)) return 'sq';
+        }
+        for (const ending of albanianEndings) {
+          if (surname.toLowerCase().endsWith(ending)) return 'sq';
+        }
+        
+        // Check for Macedonian patterns
+        for (const pattern of macedonianPatterns) {
+          if (fullName.includes(pattern)) return 'mk';
+        }
+        for (const ending of macedonianEndings) {
+          if (surname.toLowerCase().endsWith(ending)) return 'mk';
+        }
+        
+        // Default to English
+        return 'en';
+      };
+
+      const language = detectLanguage(waitlistUser.name, waitlistUser.surname);
+      console.log(`🌐 Detected language for ${waitlistUser.name} ${waitlistUser.surname}: ${language === 'sq' ? 'Albanian' : language === 'mk' ? 'Macedonian' : 'English'}`);
+      
+      // Translations
+      const translations = {
+        sq: {
+          subject: '🎉 Mirë se vini në WellNest Pilates - Sesioni juaj falas ju pret!',
+          welcome: 'Mirë se vini në WellNest Pilates!',
+          greeting: 'Përshëndetje',
+          intro: 'Jemi të entuziazmuar që t\'ju mirëpresim në familjen WellNest Pilates! 🧘‍♀️',
+          offerText: 'Si dhuratë mirëseardhje të veçantë, ju ofrojmë:',
+          offerTitle: '🎁 Ofertë ekskluzive:',
+          offerDesc: 'Blini një paketë me 8 klasë dhe merrni <strong>klasën e parë FALAS!</strong>',
+          redeemTitle: 'Kështu e shfrytëzoni:',
+          redeemSteps: [
+            'Vizitoni studion tonë ose kontaktoni për të rezervuar klasën tuaj të parë',
+            'Zgjidhni datën dhe orën e klasës tuaj të parë',
+            'Përfundoni blerjen e paketës me 8 klasë',
+            'Klasa juaj e parë është falas!'
+          ],
+          codeLabel: 'Kodi juaj i Shpërblimit:',
+          codeNote: 'Paraqisni këtë kod në studio',
+          whatYouGetTitle: 'Çfarë do të merrni:',
+          benefits: [
+            'Paketë mujore me 8 klasë Pilates në grup të vogël',
+            'Klasa e parë plotësisht falas',
+            'Udhëzim ekspert nga instruktorë të çertifikuar',
+            'Grup i vogël për vëmendje të personalizuar'
+          ],
+          locationTitle: '📍 Vendndodhja e Studios:',
+          closing: 'Nuk mund të presim të ju shohim! Nëse keni ndonjë pyetje, mos hezitoni të na kontaktoni.',
+          regards: 'Me respekt,',
+          team: 'Ekipi i WellNest Pilates'
+        },
+        mk: {
+          subject: '🎉 Добредојдовте во WellNest Pilates - Вашата бесплатна сесија ве чека!',
+          welcome: 'Добредојдовте во WellNest Pilates!',
+          greeting: 'Здраво',
+          intro: 'Воодушевени сме да ве поздравиме во семејството WellNest Pilates! 🧘‍♀️',
+          offerText: 'Како посебен подарок за добредојде, ви нудиме:',
+          offerTitle: '🎁 Ексклузивна понуда:',
+          offerDesc: 'Купете пакет од 8 класи и добијте ја <strong>првата класа БЕСПЛАТНО!</strong>',
+          redeemTitle: 'Како да искористите:',
+          redeemSteps: [
+            'Посетете не или контактирајте не за да ја резервирате вашата прва сесија',
+            'Изберете датум и време за вашата прва сесија',
+            'Комплетирајте ја купувањето на пакетот од 8 ча��а',
+            'Вашата прва сесија е бесплатна!'
+          ],
+          codeLabel: 'Вашиот код за искористување:',
+          codeNote: 'Презентирајте го овој код во студиото',
+          whatYouGetTitle: 'Што добивате:',
+          benefits: [
+            'Месечен пакет со 8 Pilates класи во мала група',
+            'Прва класа целосно бесплатна',
+            'Експертски инструкции од сертифицирани инструктори',
+            'Мала група за персонализирано внимание'
+          ],
+          locationTitle: '📍 Локација на студиото:',
+          closing: 'Нетрпеливо чекаме да ве видиме! Ако имате прашања, слободно контактирајте не.',
+          regards: 'Со почит,',
+          team: 'Тимот на WellNest Pilates'
+        },
+        en: {
+          subject: '🎉 Welcome to WellNest Pilates - Your Free Session Awaits!',
+          welcome: 'Welcome to WellNest Pilates!',
+          greeting: 'Hi',
+          intro: 'We\'re thrilled to welcome you to the WellNest Pilates family! 🧘‍♀️',
+          offerText: 'As a special welcome gift, we\'re offering you:',
+          offerTitle: '🎁 Exclusive Offer:',
+          offerDesc: 'Purchase an 8-class package and get your <strong>first session FREE!</strong>',
+          redeemTitle: 'Here\'s how to redeem:',
+          redeemSteps: [
+            'Visit our studio or contact us to book your first session',
+            'Select your first session date and time',
+            'Complete the 8-class package purchase',
+            'Your first session is on us!'
+          ],
+          codeLabel: 'Your Redemption Code:',
+          codeNote: 'Present this code at the studio',
+          whatYouGetTitle: 'What you\'ll get:',
+          benefits: [
+            'Monthly package with 8 Pilates classes in small group',
+            'First class completely free',
+            'Expert instruction from certified instructors',
+            'Small group setting for personalized attention'
+          ],
+          locationTitle: '📍 Studio Location:',
+          closing: 'We can\'t wait to see you on the mat! If you have any questions, feel free to reach out.',
+          regards: 'Best regards,',
+          team: 'The WellNest Pilates Team'
+        }
+      };
+
+      const t = translations[language];
+
+      // Create welcome email
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              line-height: 1.5; 
+              color: #333333;
+              margin: 0;
+              padding: 0;
+              background-color: #f5f5f5;
+              font-size: 13px;
+            }
+            .container { 
+              max-width: 600px; 
+              margin: 40px auto; 
+              background: #ffffff;
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .header { 
+              background: linear-gradient(135deg, #9ca571 0%, #8a9463 100%); 
+              color: white; 
+              padding: 24px 32px; 
+              text-align: center;
+            }
+            .logo {
+              max-width: 200px;
+              height: auto;
+              margin-bottom: 16px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 20px;
+              font-weight: 600;
+            }
+            .content { 
+              background: #ffffff; 
+              padding: 32px;
+            }
+            .greeting {
+              font-size: 14px;
+              font-weight: 600;
+              margin-bottom: 16px;
+              color: #333333;
+            }
+            .intro {
+              margin-bottom: 16px;
+              color: #333333;
+              font-size: 13px;
+            }
+            .offer-box {
+              background: #f8f8f8;
+              border-left: 4px solid #9ca571;
+              padding: 12px 16px;
+              margin: 20px 0;
+              font-size: 13px;
+            }
+            .offer-box strong {
+              color: #333333;
+            }
+            .section-title {
+              font-weight: 600;
+              margin: 20px 0 10px 0;
+              color: #333333;
+              font-size: 13px;
+            }
+            .code-box { 
+              background: #ffffff;
+              border: 2px dashed #cccccc; 
+              padding: 20px; 
+              border-radius: 8px; 
+              text-align: center; 
+              margin: 20px 0;
+            }
+            .code-label {
+              margin: 0 0 8px 0;
+              font-size: 12px;
+              color: #666666;
+            }
+            .code { 
+              font-size: 24px; 
+              font-weight: 700; 
+              color: #9ca571; 
+              letter-spacing: 3px;
+              font-family: 'Courier New', monospace;
+            }
+            .code-note {
+              margin: 8px 0 0 0;
+              font-size: 11px;
+              color: #666666;
+            }
+            .location-box {
+              background: #f8f8f8;
+              border-left: 4px solid #d4a574;
+              padding: 12px 16px;
+              margin: 20px 0;
+              font-size: 13px;
+            }
+            ul { 
+              padding-left: 20px; 
+              margin: 10px 0;
+            }
+            li { 
+              margin: 6px 0; 
+              color: #333333;
+              font-size: 13px;
+            }
+            p {
+              font-size: 13px;
+              margin: 12px 0;
+            }
+            .footer {
+              background: #f8f8f8;
+              padding: 20px 32px;
+              text-align: left;
+              border-top: 1px solid #e8e8e8;
+            }
+            .footer-title {
+              color: #d4a574;
+              font-weight: 600;
+              margin-bottom: 6px;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <img src="https://raw.githubusercontent.com/yourusername/yourrepo/main/wellnest-logo.png" alt="WellNest Pilates" class="logo" />
+              <h1>🎉 ${t.welcome}</h1>
+            </div>
+            
+            <div class="content">
+              <p class="greeting">${t.greeting} ${waitlistUser.name},</p>
+              
+              <p class="intro">${t.intro}</p>
+              
+              <p>${t.offerText}</p>
+              
+              <div class="offer-box">
+                <strong>${t.offerTitle}</strong> ${t.offerDesc}
+              </div>
+
+              <p class="section-title">${t.redeemTitle}</p>
+              <ul>
+                ${t.redeemSteps.map(step => `<li>${step}</li>`).join('')}
+              </ul>
+
+              <div class="code-box">
+                <p class="code-label">${t.codeLabel}</p>
+                <div class="code">${waitlistUser.redemptionCode}</div>
+                <p class="code-note">${t.codeNote}</p>
+              </div>
+
+              <p class="section-title">${t.whatYouGetTitle}</p>
+              <ul>
+                ${t.benefits.map(benefit => `<li>${benefit}</li>`).join('')}
+              </ul>
+
+              <div class="location-box">
+                <p class="footer-title">${t.locationTitle}</p>
+                Gjuro Gjakovikj 59, Kumanovo 1300
+              </div>
+
+              <p style="margin-top: 24px;">${t.closing}</p>
+              
+              <p style="margin-top: 20px;">${t.regards}<br><strong>${t.team}</strong></p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 0; color: #666666; font-size: 12px;">
+                <strong style="color: #333333;">WellNest Pilates</strong><br>
+                Gjuro Gjakovikj 59, Kumanovo 1300<br>
+                <a href="mailto:info@wellnest-pilates.com" style="color: #9ca571; text-decoration: none;">info@wellnest-pilates.com</a>
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Send email via Resend
+      try {
+        console.log(`📧 Attempting to send email to ${normalizedEmail}...`);
+        console.log(`📧 Using API key: ${resendApiKey ? 'PRESENT (length: ' + resendApiKey.length + ')' : 'MISSING'}`);
+        
+        const emailPayload = {
+          from: 'WellNest Pilates <onboarding@resend.dev>',
+          to: [normalizedEmail],
+          subject: t.subject,
+          html: emailHtml,
+        };
+        
+        console.log('📧 Email payload:', JSON.stringify({ 
+          from: emailPayload.from, 
+          to: emailPayload.to, 
+          subject: emailPayload.subject,
+          htmlLength: emailHtml.length 
+        }));
+
+        const emailResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(emailPayload),
+        });
+
+        console.log(`📧 Resend API response status: ${emailResponse.status} ${emailResponse.statusText}`);
+
+        if (emailResponse.ok) {
+          const responseData = await emailResponse.json();
+          console.log(`✅ Resend API success response:`, responseData);
+          
+          // Update waitlist user status
+          waitlistUser.status = 'invited';
+          waitlistUser.invitedAt = new Date().toISOString();
+          waitlistUser.inviteEmailSent = true;
+          await kv.set(waitlistId, waitlistUser);
+
+          results.push({ email, success: true, redemptionCode: waitlistUser.redemptionCode });
+          console.log(`✅ Sent invite email to ${normalizedEmail}`);
+        } else {
+          const errorData = await emailResponse.text();
+          console.error(`❌ Resend API error response:`, errorData);
+          results.push({ email, success: false, error: `Resend API error (${emailResponse.status}): ${errorData}` });
+          console.error(`❌ Failed to send email to ${normalizedEmail}:`, errorData);
+        }
+      } catch (emailError) {
+        console.error(`❌ Email exception for ${normalizedEmail}:`, emailError);
+        results.push({ email, success: false, error: emailError.message });
+        console.error(`❌ Email error for ${normalizedEmail}:`, emailError);
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    return c.json({
+      success: true,
+      results,
+      summary: {
+        total: results.length,
+        successful: successCount,
+        failed: failureCount
+      }
+    });
+  } catch (error) {
+    console.error('Error sending invite emails:', error);
+    return c.json({ error: 'Failed to send invite emails', details: error.message }, 500);
+  }
+});
+
+// Verify redemption code and get waitlist user details
+app.get("/make-server-b87b0c07/waitlist/verify/:code", async (c) => {
+  try {
+    const code = c.req.param('code');
+    
+    if (!code) {
+      return c.json({ error: 'No code provided' }, 400);
+    }
+
+    // Find waitlist user by redemption code
+    const allWaitlistUsers = await kv.getByPrefix('waitlist:');
+    const waitlistUser = allWaitlistUsers.find(u => u.redemptionCode === code);
+
+    if (!waitlistUser) {
+      return c.json({ error: 'Invalid redemption code' }, 404);
+    }
+
+    if (waitlistUser.status === 'redeemed') {
+      return c.json({ error: 'Code already redeemed' }, 400);
+    }
+
+    return c.json({ 
+      success: true, 
+      user: {
+        name: waitlistUser.name,
+        surname: waitlistUser.surname,
+        email: waitlistUser.email,
+        mobile: waitlistUser.mobile,
+        redemptionCode: waitlistUser.redemptionCode
+      }
+    });
+  } catch (error) {
+    console.error('Error verifying redemption code:', error);
+    return c.json({ error: 'Failed to verify code', details: error.message }, 500);
+  }
+});
+
+// Redeem waitlist offer (purchase 8-pack with free first session)
+app.post("/make-server-b87b0c07/waitlist/redeem", async (c) => {
+  try {
+    const { code, dateKey, timeSlot, instructor = 'Besa' } = await c.req.json();
+
+    if (!code || !dateKey || !timeSlot) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    // Find and verify waitlist user
+    const allWaitlistUsers = await kv.getByPrefix('waitlist:');
+    const waitlistUser = allWaitlistUsers.find(u => u.redemptionCode === code);
+
+    if (!waitlistUser) {
+      return c.json({ error: 'Invalid redemption code' }, 404);
+    }
+
+    if (waitlistUser.status === 'redeemed') {
+      return c.json({ error: 'Code already redeemed' }, 400);
+    }
+
+    const { name, surname, email, mobile } = waitlistUser;
+    const normalizedEmail = email.toLowerCase().trim();
+    const userKey = `user:${normalizedEmail}`;
+
+    // Create or update user account
+    let user = await kv.get(userKey);
+    
+    if (!user) {
+      user = {
+        id: userKey,
+        email: normalizedEmail,
+        name,
+        surname,
+        mobile,
+        role: 'user',
+        status: 'active',
+        hasPassword: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isWaitlistUser: true,
+        waitlistRedemptionCode: code
+      };
+      await kv.set(userKey, user);
+    }
+
+    // Create 8-class package
+    const packageId = `package:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const package8 = {
+      id: packageId,
+      userId: normalizedEmail,
+      packageType: 'package8',
+      totalSessions: 8,
+      usedSessions: 0,
+      remainingSessions: 8,
+      purchasedDate: new Date().toISOString(),
+      activatedDate: new Date().toISOString(),
+      expiryDate: new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString(),
+      isWaitlistPackage: true,
+      waitlistRedemptionCode: code,
+      status: 'active'
+    };
+    await kv.set(packageId, package8);
+
+    // Book first session (FREE)
+    const dateString = formatDateString(dateKey);
+    const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullDate = constructFullDate(dateKey, timeSlot);
+    const endTime = calculateEndTime(timeSlot);
+
+    const reservation = {
+      id: reservationId,
+      userId: normalizedEmail,
+      packageId,
+      sessionNumber: 1,
+      serviceType: 'package8' as ServiceType,
+      dateKey,
+      date: dateString,
+      fullDate,
+      timeSlot,
+      endTime,
+      instructor,
+      name,
+      surname,
+      email: normalizedEmail,
+      mobile,
+      partnerName: null,
+      partnerSurname: null,
+      reservationStatus: 'confirmed' as ReservationStatus,
+      paymentStatus: 'paid' as PaymentStatus, // First session is FREE
+      seatsOccupied: 1,
+      isPrivateSession: false,
+      isOverbooked: false,
+      isFirstSessionOfPackage: true,
+      isFreeWaitlistSession: true,
+      waitlistRedemptionCode: code,
+      autoConfirmed: true,
+      lateCancellation: false,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      activatedAt: new Date().toISOString(),
+      attendedAt: null,
+      language: 'en'
+    };
+
+    await kv.set(reservationId, reservation);
+
+    // Update package to reflect first session booked
+    package8.usedSessions = 1;
+    package8.remainingSessions = 7;
+    await kv.set(packageId, package8);
+
+    // Mark waitlist user as redeemed
+    waitlistUser.status = 'redeemed';
+    waitlistUser.redeemedAt = new Date().toISOString();
+    waitlistUser.packageId = packageId;
+    await kv.set(waitlistUser.id, waitlistUser);
+
+    console.log(`✅ Waitlist offer redeemed by ${normalizedEmail} - First session FREE`);
+
+    return c.json({
+      success: true,
+      message: 'Welcome package activated! Your first session is FREE.',
+      package: package8,
+      reservation,
+      user: {
+        email: normalizedEmail,
+        name,
+        surname,
+        mobile
+      }
+    });
+  } catch (error) {
+    console.error('Error redeeming waitlist offer:', error);
+    return c.json({ error: 'Failed to redeem offer', details: error.message }, 500);
+  }
+});
+
+// Delete waitlist user (admin only)
+app.delete("/make-server-b87b0c07/admin/waitlist/:email", async (c) => {
+  try {
+    const email = c.req.param('email');
+    const normalizedEmail = email.toLowerCase().trim();
+    const waitlistId = `waitlist:${normalizedEmail}`;
+
+    const waitlistUser = await kv.get(waitlistId);
+    
+    if (!waitlistUser) {
+      return c.json({ error: 'User not found in waitlist' }, 404);
+    }
+
+    await kv.del(waitlistId);
+    console.log(`🗑️ Removed ${normalizedEmail} from waitlist`);
+
+    return c.json({ success: true, message: 'User removed from waitlist' });
+  } catch (error) {
+    console.error('Error deleting waitlist user:', error);
+    return c.json({ error: 'Failed to delete waitlist user', details: error.message }, 500);
+  }
+});
+
+// ============ LOGO UPLOAD ENDPOINT ============
+app.post('/make-server-b87b0c07/upload-logo', async (c) => {
+  try {
+    console.log('📤 Upload logo request received');
+    
+    const formData = await c.req.formData();
+    const file = formData.get('logo');
+    
+    if (!file || !(file instanceof File)) {
+      return c.json({ error: 'No logo file provided' }, 400);
+    }
+    
+    console.log('📁 File received:', file.name, file.type, file.size, 'bytes');
+    
+    // Convert file to ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = new Uint8Array(arrayBuffer);
+    
+    // Create Supabase client with service role key
+    const { createClient } = await import('npm:@supabase/supabase-js');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+    
+    // Ensure assets bucket exists and is public
+    const bucketName = 'assets';
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log('📦 Creating assets bucket...');
+      const { error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+      });
+      
+      if (createError) {
+        console.error('❌ Failed to create bucket:', createError);
+        return c.json({ error: 'Failed to create storage bucket', details: createError.message }, 500);
+      }
+    }
+    
+    // Upload logo
+    const fileName = 'wellnest-logo.png';
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, fileBuffer, {
+        contentType: file.type,
+        upsert: true, // Replace if exists
+      });
+    
+    if (uploadError) {
+      console.error('❌ Upload error:', uploadError);
+      return c.json({ error: 'Failed to upload logo', details: uploadError.message }, 500);
+    }
+    
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(fileName);
+    
+    const publicUrl = urlData.publicUrl;
+    console.log('✅ Logo uploaded successfully:', publicUrl);
+    
+    return c.json({ 
+      success: true, 
+      url: publicUrl,
+      message: 'Logo uploaded successfully. Please update the email template with this URL.'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error uploading logo:', error);
+    return c.json({ error: 'Failed to upload logo', details: error.message }, 500);
   }
 });
 

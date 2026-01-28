@@ -22,10 +22,10 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
   const handleConfirm = async () => {
     const newErrors: Record<string, boolean> = {};
     
-    if (!bookingData.name.trim()) newErrors.name = true;
-    if (!bookingData.surname.trim()) newErrors.surname = true;
-    if (!bookingData.mobile.trim()) newErrors.mobile = true;
-    if (!bookingData.email.trim()) newErrors.email = true;
+    if (!(bookingData.name || '').trim()) newErrors.name = true;
+    if (!(bookingData.surname || '').trim()) newErrors.surname = true;
+    if (!(bookingData.mobile || '').trim()) newErrors.mobile = true;
+    if (!(bookingData.email || '').trim()) newErrors.email = true;
     if (!bookingData.password || bookingData.password.length < 6) newErrors.password = true;
 
     if (Object.keys(newErrors).length > 0) {
@@ -159,9 +159,6 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
               </p>
             )}
           </div>
-          <div className="text-[#6b5949]">
-            <p className="text-xs">{t.instructor}: Rina Krasniqi</p>
-          </div>
           {/* Show price only for single sessions */}
           {bookingData.timeSlot !== 'package' && !bookingData.selectedPackage && (
             <div className="pt-2 border-t border-[#f5f0ed]">
@@ -177,10 +174,10 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
               <div className="flex justify-between items-center">
                 <p className="text-sm text-[#6b5949]">{t.totalPrice}:</p>
                 <p className="text-base text-[#3d2f28]">
-                  {bookingData.selectedPackage === 'package4' 
-                    ? '1800 DEN' 
-                    : bookingData.selectedPackage === 'package8' 
-                    ? '3400 DEN' 
+                  {bookingData.selectedPackage === 'package8' 
+                    ? '3500 DEN' 
+                    : bookingData.selectedPackage === 'package10' 
+                    ? '4200 DEN' 
                     : '4800 DEN'}
                 </p>
               </div>
@@ -195,7 +192,7 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
           <input
             type="text"
             placeholder={`${t.name}*`}
-            value={bookingData.name}
+            value={bookingData.name || ''}
             onChange={(e) => handleInputChange('name', e.target.value)}
             className={`w-full px-3 py-2 rounded-lg bg-[#f5f0ed] text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949] ${
               errors.name ? 'ring-2 ring-red-500' : ''
@@ -206,7 +203,7 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
           <input
             type="text"
             placeholder={`${t.surname}*`}
-            value={bookingData.surname}
+            value={bookingData.surname || ''}
             onChange={(e) => handleInputChange('surname', e.target.value)}
             className={`w-full px-3 py-2 rounded-lg bg-[#f5f0ed] text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949] ${
               errors.surname ? 'ring-2 ring-red-500' : ''
@@ -217,7 +214,7 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
           <input
             type="tel"
             placeholder={`${t.mobile}*`}
-            value={bookingData.mobile}
+            value={bookingData.mobile || ''}
             onChange={(e) => handleInputChange('mobile', e.target.value)}
             className={`w-full px-3 py-2 rounded-lg bg-[#f5f0ed] text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949] ${
               errors.mobile ? 'ring-2 ring-red-500' : ''
@@ -228,7 +225,7 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
           <input
             type="email"
             placeholder={`${t.email}*`}
-            value={bookingData.email}
+            value={bookingData.email || ''}
             onChange={(e) => handleInputChange('email', e.target.value)}
             className={`w-full px-3 py-2 rounded-lg bg-[#f5f0ed] text-sm text-[#3d2f28] placeholder:text-[#8b7764] focus:outline-none focus:ring-2 focus:ring-[#6b5949] ${
               errors.email ? 'ring-2 ring-red-500' : ''

@@ -36,9 +36,9 @@ export function DuoTraining({ onBack, language, onLogoClick }: DuoTrainingProps)
       type: '1class' as const,
       sessions: 1,
       label: t.individual1Class,
-      description: t.individual1ClassDesc,
-      price: 1200,
-      perClass: 1200,
+      description: t.duo1ClassDesc || 'One duo class',
+      price: 2100,
+      perClass: 2100,
       savings: 0,
       isRecommended: false,
     },
@@ -47,9 +47,9 @@ export function DuoTraining({ onBack, language, onLogoClick }: DuoTrainingProps)
       sessions: 8,
       label: t.individual8Classes,
       description: t.individual8ClassDesc,
-      price: 7000,
-      perClass: 875,
-      savings: 2600,
+      price: 13400,
+      perClass: 1675,
+      savings: 3400,
       isRecommended: true,
     },
     {
@@ -57,9 +57,9 @@ export function DuoTraining({ onBack, language, onLogoClick }: DuoTrainingProps)
       sessions: 12,
       label: t.individual12Classes,
       description: t.individual12ClassDesc,
-      price: 9500,
-      perClass: 792,
-      savings: 4900,
+      price: 18400,
+      perClass: 1533,
+      savings: 6800,
       isRecommended: false,
     },
   ];
@@ -211,9 +211,35 @@ export function DuoTraining({ onBack, language, onLogoClick }: DuoTrainingProps)
               </div>
 
               {/* Pricing */}
-              <div className="mb-4">
+              <div className="mb-3">
                 <div className="text-[32px] font-bold text-[#3d2f28] tracking-tight">
                   {pkg.price} <span className="text-base font-semibold text-[#6b5949]">DEN</span>
+                </div>
+              </div>
+
+              {/* Package Description */}
+              {pkg.type !== '1class' && (
+                <div className="mb-4">
+                  <p className="text-xs text-[#8b7764] leading-relaxed">
+                    {pkg.type === '8classes' && (t.duo8Detail || '8 training packages for two people (twice a week). For 35 days.')}
+                    {pkg.type === '12classes' && (t.duo12Detail || '12 training packages for two people (three times a week). For 35 days.')}
+                  </p>
+                </div>
+              )}
+
+              {/* Key Purchase Context */}
+              <div className="mb-4 space-y-1.5">
+                <div className="flex items-center gap-2 text-xs text-[#6b5949]">
+                  <div className="w-1 h-1 bg-[#9ca571] rounded-full"></div>
+                  <span>{t.classDuration || '50 min'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b5949]">
+                  <div className="w-1 h-1 bg-[#9ca571] rounded-full"></div>
+                  <span>{t.validityPeriod || 'Valid 35 days'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b5949]">
+                  <div className="w-1 h-1 bg-[#9ca571] rounded-full"></div>
+                  <span>{t.privateStudio || 'Private studio included'}</span>
                 </div>
               </div>
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, Users, LogOut, Mail, X, CheckCircle, Trash2, Ban, Gift, ShieldAlert, Settings } from 'lucide-react';
+import { Calendar, Users, LogOut, Mail, X, CheckCircle, Trash2, Ban, Gift, ShieldAlert, Settings, UserPlus, Send } from 'lucide-react';
 import logo from 'figma:asset/d3b087d995c1120c4f6f827938a39596d087b710.png';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { DevTools } from './DevTools';
+import { BulkWaitlistUpload } from './BulkWaitlistUpload';
 
 export type UserStatus = 'pending' | 'confirmed' | 'cancelled';
 
@@ -13,14 +14,14 @@ export type User = {
   mobile: string;
   email: string;
   status: UserStatus;
-  packageType?: 'package4' | 'package8' | 'package12' | 'single';
+  packageType?: 'package8' | 'package10' | 'package12' | 'single';
   bookingDate?: string;
   bookingTime?: string;
   totalSessions?: number; // Total sessions purchased across all packages
   usedSessions?: number; // Sessions used
   remainingSessions?: number; // Sessions remaining
   packages?: Array<{ // Track all packages purchased
-    type: 'package4' | 'package8' | 'package12';
+    type: 'package8' | 'package10' | 'package12';
     sessions: number;
     purchasedDate: string;
     activatedDate?: string;
@@ -39,7 +40,7 @@ export type Booking = {
   dateKey: string;
   timeSlot: string;
   instructor: string;
-  selectedPackage?: 'package4' | 'package8' | 'package12';
+  selectedPackage?: 'package8' | 'package10' | 'package12';
   payInStudio: boolean;
   language: string;
   status: UserStatus;
@@ -60,9 +61,23 @@ const mockUsers: User[] = [];
 
 const mockBookings: Booking[] = [];
 
+type WaitlistUser = {
+  id: string;
+  name: string;
+  surname: string;
+  mobile: string;
+  email: string;
+  redemptionCode: string;
+  status: 'pending' | 'invited' | 'redeemed';
+  addedAt: string;
+  invitedAt?: string;
+  redeemedAt?: string;
+  inviteEmailSent: boolean;
+};
+
 export function AdminPanel({ onLogout }: AdminPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'users'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'users' | 'waitlist'>('calendar');
   const [userSubTab, setUserSubTab] = useState<'confirmed' | 'pending'>('confirmed');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
@@ -80,11 +95,20 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [giftNote, setGiftNote] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
+  
+  // Waitlist state
+  const [waitlistUsers, setWaitlistUsers] = useState<WaitlistUser[]>([]);
+  const [selectedWaitlistUsers, setSelectedWaitlistUsers] = useState<string[]>([]);
+  const [isSendingInvites, setIsSendingInvites] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Fetch all bookings on component mount
   useEffect(() => {
     fetchBookings();
-  }, []);
+    if (activeTab === 'waitlist') {
+      fetchWaitlistUsers();
+    }
+  }, [activeTab]);
 
   // Scroll to top whenever tab changes
   useEffect(() => {
@@ -97,7 +121,76 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const fetchBookings = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/bookings`, {
+      
+      // Fetch bookings for calendar view
+      const bookingsResponse = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/bookings`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+      });
+
+      const bookingsData = await bookingsResponse.json();
+
+      if (!bookingsResponse.ok) {
+        console.error('Failed to fetch bookings:', bookingsData);
+      } else {
+        console.log('Fetched bookings:', bookingsData.bookings);
+        setBookings(bookingsData.bookings || []);
+      }
+
+      // Fetch users with aggregated data for Users tab
+      const usersResponse = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+      });
+
+      const usersData = await usersResponse.json();
+
+      if (!usersResponse.ok) {
+        console.error('Failed to fetch users:', usersData);
+        return;
+      }
+
+      console.log('Fetched users:', usersData);
+
+      // Convert to AdminPanel User format
+      const formattedUsers: User[] = usersData.users.map((user: any) => {
+        const status = user.paymentStatus === 'paid' ? 'confirmed' : 'pending';
+        console.log(`User ${user.email}: paymentStatus=${user.paymentStatus}, mapped status=${status}`);
+        return {
+          id: user.id,
+          name: user.name,
+          surname: user.surname,
+          mobile: user.mobile,
+          email: user.email,
+          status, // Map payment status to display status
+          packageType: user.packages[0]?.type || 'single',
+          totalSessions: user.totalSessions,
+          usedSessions: user.usedSessions,
+          remainingSessions: user.remainingSessions,
+          packages: user.packages,
+        };
+      });
+
+      console.log('Formatted users:', formattedUsers);
+      console.log('Pending users:', formattedUsers.filter(u => u.status === 'pending'));
+      console.log('Confirmed users:', formattedUsers.filter(u => u.status === 'confirmed'));
+
+      setUsers(formattedUsers);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchWaitlistUsers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/waitlist`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${publicAnonKey}`,
@@ -107,33 +200,137 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Failed to fetch bookings:', data);
+        console.error('Failed to fetch waitlist:', data);
         return;
       }
 
-      console.log('Fetched bookings:', data.bookings);
-      setBookings(data.bookings || []);
-
-      // Convert bookings to users format for the Users tab
-      const usersFromBookings: User[] = data.bookings.map((booking: any) => ({
-        id: booking.id,
-        name: booking.name,
-        surname: booking.surname,
-        mobile: booking.mobile,
-        email: booking.email,
-        status: booking.status,
-        packageType: booking.selectedPackage || 'single',
-        bookingDate: booking.date,
-        bookingTime: booking.timeSlot,
-        codeSentAt: booking.codeSentAt,
-        activationCode: booking.activationCodeSent, // The unique code (e.g., "WN-XXXX-XXXX")
-      }));
-
-      setUsers(usersFromBookings);
+      console.log('Fetched waitlist users:', data.users);
+      setWaitlistUsers(data.users || []);
     } catch (error) {
-      console.error('Error fetching bookings:', error);
+      console.error('Error fetching waitlist:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendInvites = async (emails: string[], bulk = false) => {
+    try {
+      setIsSendingInvites(true);
+      setInviteStatus(null);
+
+      console.log('📧 Attempting to send invites to:', emails);
+
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/waitlist/send-invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify({ emails, bulk }),
+      });
+
+      const data = await response.json();
+      console.log('📧 Email sending response:', data);
+
+      if (!response.ok) {
+        console.error('❌ Failed to send invites:', data);
+        setInviteStatus({ type: 'error', message: data.error || 'Failed to send invites' });
+        return;
+      }
+
+      const { summary, results } = data;
+      
+      // Log individual results
+      results.forEach((result: any) => {
+        if (result.success) {
+          console.log(`✅ Email sent successfully to ${result.email}`);
+        } else {
+          console.error(`❌ Failed to send email to ${result.email}:`, result.error);
+        }
+      });
+
+      if (summary.failed > 0) {
+        const failedEmails = results.filter((r: any) => !r.success).map((r: any) => r.email).join(', ');
+        setInviteStatus({ 
+          type: 'error', 
+          message: `Failed to send ${summary.failed} invite(s) to: ${failedEmails}. Check console for details.` 
+        });
+      } else {
+        setInviteStatus({ 
+          type: 'success', 
+          message: `✅ Sent ${summary.successful} invite${summary.successful > 1 ? 's' : ''} successfully!` 
+        });
+      }
+
+      // Refresh waitlist
+      fetchWaitlistUsers();
+      
+      // Clear selection
+      setSelectedWaitlistUsers([]);
+
+      // Auto-dismiss after 7 seconds
+      setTimeout(() => setInviteStatus(null), 7000);
+    } catch (error) {
+      console.error('❌ Error sending invites:', error);
+      setInviteStatus({ type: 'error', message: `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}` });
+    } finally {
+      setIsSendingInvites(false);
+    }
+  };
+
+  const handleDeleteWaitlistUser = async (email: string) => {
+    if (!confirm(`Remove ${email} from waitlist?`)) return;
+
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/waitlist/${email}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+      });
+
+      if (response.ok) {
+        fetchWaitlistUsers();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting waitlist user:', error);
+      alert('An error occurred');
+    }
+  };
+
+  const handleAddBesaToWaitlist = async () => {
+    setIsProcessing(true);
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/waitlist`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Besa',
+          surname: 'Ibrahimi',
+          mobile: '70810726',
+          email: 'asani.kastri@gmail.com'
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`✅ Successfully added Besa Ibrahimi!\nRedemption Code: ${data.waitlistUser.redemptionCode}`);
+        fetchWaitlistUsers();
+      } else {
+        alert(data.error || 'Failed to add user to waitlist');
+      }
+    } catch (error) {
+      console.error('Error adding to waitlist:', error);
+      alert('An error occurred');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -170,13 +367,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const dates = generateAdminDates();
 
   const timeSlots: TimeSlot[] = [
-    { time: '08:00 - 09:00', maxCapacity: 4 },
     { time: '09:00 - 10:00', maxCapacity: 4 },
     { time: '10:00 - 11:00', maxCapacity: 4 },
-    { time: '11:00 - 12:00', maxCapacity: 4 },
     { time: '16:00 - 17:00', maxCapacity: 4 },
     { time: '17:00 - 18:00', maxCapacity: 4 },
     { time: '18:00 - 19:00', maxCapacity: 4 },
+    { time: '19:00 - 20:00', maxCapacity: 4 },
+    { time: '20:00 - 21:00', maxCapacity: 4 },
   ];
 
   const maxDailyCapacity = timeSlots.length * 4; // 7 slots × 4 capacity = 28 max bookings per day
@@ -221,45 +418,46 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   };
 
   const handleStatusChange = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    // Toggle between 'pending' (unpaid) and 'confirmed' (paid)
+    const newStatus: UserStatus = user.status === 'pending' ? 'confirmed' : 'pending';
+    const paymentStatus = newStatus === 'confirmed' ? 'paid' : 'unpaid';
+
+    // Optimistic UI update
     setUsers(prevUsers =>
-      prevUsers.map(user => {
-        if (user.id === userId) {
-          const statusOrder: UserStatus[] = ['pending', 'confirmed', 'cancelled'];
-          const currentIndex = statusOrder.indexOf(user.status);
-          const nextIndex = (currentIndex + 1) % statusOrder.length;
-          const newStatus = statusOrder[nextIndex];
-          
-          // Update status in backend
-          updateBookingStatus(userId, newStatus);
-          
-          return { ...user, status: newStatus };
-        }
-        return user;
-      })
+      prevUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u)
     );
+
+    // Update payment status in backend
+    updatePaymentStatus(user.email, paymentStatus);
   };
 
-  const updateBookingStatus = async (bookingId: string, newStatus: UserStatus) => {
+  const updatePaymentStatus = async (email: string, paymentStatus: 'paid' | 'unpaid') => {
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/bookings/${bookingId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/users/${encodeURIComponent(email)}/payment`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({ paymentStatus }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Failed to update booking status:', data);
+        console.error('Failed to update payment status:', data);
         // Revert the change if backend update fails
         fetchBookings();
         return;
       }
 
-      console.log('Booking status updated successfully:', data);
+      console.log('Payment status updated successfully:', data);
       
       // Also update in bookings array
       setBookings(prevBookings =>
@@ -275,11 +473,11 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   };
 
   const handleSendCode = async (user: User) => {
-    // Directly send activation code without showing modal
+    // Resend activation code to user
     setIsSendingEmail(true);
 
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/send-activation-code`, {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/resend-activation-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,30 +485,31 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
         },
         body: JSON.stringify({
           email: user.email,
-          name: user.name,
-          surname: user.surname,
-          bookingId: user.id,
-          packageType: user.packageType,
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        console.error('Failed to send activation code:', data);
-        alert('Failed to send activation code. Please try again.');
+        const errorText = await response.text();
+        console.error('Failed to resend activation code:', errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          alert(errorData.error || 'Failed to resend activation code. Please try again.');
+        } catch {
+          alert('Failed to resend activation code. The user may not have any active codes.');
+        }
+        
         setIsSendingEmail(false);
         return;
       }
 
-      console.log('Activation code sent successfully:', data);
+      const data = await response.json();
+      console.log('Activation code resent successfully:', data);
 
-      // The backend automatically updates the status to 'confirmed' when sending the code
-      // Just refresh the bookings list to reflect the changes
-      await fetchBookings();
+      alert(`Activation code resent to ${user.email}`);
       setIsSendingEmail(false);
     } catch (error) {
-      console.error('Error sending activation code:', error);
+      console.error('Error resending activation code:', error);
       alert('Network error. Please check your connection.');
       setIsSendingEmail(false);
     }
@@ -405,6 +604,22 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
           >
             <Users className="w-4 h-4" />
             Users
+          </button>
+          <button
+            onClick={() => setActiveTab('waitlist')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors ${
+              activeTab === 'waitlist'
+                ? 'text-[#6b5949] border-b-2 border-[#6b5949]'
+                : 'text-[#8b7764] hover:text-[#6b5949]'
+            }`}
+          >
+            <UserPlus className="w-4 h-4" />
+            Waitlist
+            {waitlistUsers.filter(u => u.status === 'pending').length > 0 && (
+              <span className="bg-[#9ca571] text-white text-xs px-2 py-0.5 rounded-full">
+                {waitlistUsers.filter(u => u.status === 'pending').length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -600,10 +815,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                                 <div>
                                   <p className="text-sm text-[#3d2f28] font-medium">{booking.name} {booking.surname}</p>
                                   <p className="text-xs text-[#8b7764] mt-0.5">
-                                    {booking.selectedPackage === 'package4'
-                                      ? '4 Sessions Package'
-                                      : booking.selectedPackage === 'package8'
+                                    {booking.selectedPackage === 'package8'
                                       ? '8 Sessions Package'
+                                      : booking.selectedPackage === 'package10'
+                                      ? '10 Sessions Package'
                                       : booking.selectedPackage === 'package12'
                                       ? '12 Sessions Package'
                                       : 'Single Session'}
@@ -632,7 +847,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'users' ? (
           <div className="flex-1 overflow-y-auto">
             <div className="bg-white rounded-lg shadow-sm">
               {/* User Database Header */}
@@ -673,11 +888,14 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
               {/* User List */}
               <div className="p-4 space-y-2">
-                {users
-                  .filter(user => user.status === userSubTab)
+                {(() => {
+                  const filtered = users.filter(user => user.status === userSubTab);
+                  console.log(`Rendering ${userSubTab} tab. Total users: ${users.length}, Filtered: ${filtered.length}`);
+                  return filtered;
+                })()
                   .map((user) => {
                     const isExpanded = expandedUserId === user.id;
-                    const sessionCount = user.packageType === 'package4' ? 4 : user.packageType === 'package8' ? 8 : user.packageType === 'package12' ? 12 : 1;
+                    const sessionCount = user.packageType === 'package8' ? 8 : user.packageType === 'package10' ? 10 : user.packageType === 'package12' ? 12 : 1;
                     const usedSessions = user.usedSessions || 0;
                     const remainingSessions = sessionCount - usedSessions;
 
@@ -734,8 +952,8 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                               </div>
 
                               <div className="text-sm text-[#3d2f28] font-medium">
-                                {user.packageType === 'package4' && '4 Sessions (1800 DEN)'}
-                                {user.packageType === 'package8' && '8 Sessions (3400 DEN)'}
+                                {user.packageType === 'package8' && '8 Sessions (3500 DEN)'}
+                                {user.packageType === 'package10' && '10 Sessions (4200 DEN)'}
                                 {user.packageType === 'package12' && '12 Sessions (4800 DEN)'}
                                 {user.packageType === 'single' && 'Single (500 DEN)'}
                               </div>
@@ -850,7 +1068,188 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
               </div>
             </div>
           </div>
-        )}
+        ) : activeTab === 'waitlist' ? (
+          <div className="space-y-4">
+            {/* Waitlist Header */}
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#3d2f28]">Waitlist Management</h2>
+                  <p className="text-xs text-[#8b7764] mt-1">
+                    {waitlistUsers.length} total &bull; {waitlistUsers.filter(u => u.status === 'pending').length} pending &bull; {waitlistUsers.filter(u => u.status === 'invited').length} invited &bull; {waitlistUsers.filter(u => u.status === 'redeemed').length} redeemed
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={fetchWaitlistUsers}
+                    className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-[#6b5949] px-3 py-2 rounded-lg text-sm transition-all"
+                    title="Refresh waitlist"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </button>
+                  {waitlistUsers.length === 0 && (
+                    <button
+                      onClick={handleAddBesaToWaitlist}
+                      disabled={isProcessing}
+                      className="flex items-center gap-2 bg-gradient-to-r from-[#6b5949] to-[#8b7764] text-white px-4 py-2 rounded-lg text-sm hover:shadow-lg transition-all disabled:opacity-50"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      {isProcessing ? 'Adding...' : 'Add Besa Ibrahimi'}
+                    </button>
+                  )}
+                  {selectedWaitlistUsers.length > 0 && (
+                    <button
+                      onClick={() => handleSendInvites(selectedWaitlistUsers, true)}
+                      disabled={isSendingInvites}
+                      className="flex items-center gap-2 bg-gradient-to-r from-[#9ca571] to-[#8a9463] text-white px-4 py-2 rounded-lg text-sm hover:shadow-lg transition-all disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                      {isSendingInvites ? 'Sending...' : `Send ${selectedWaitlistUsers.length} Invite${selectedWaitlistUsers.length > 1 ? 's' : ''}`}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Message */}
+              {inviteStatus && (
+                <div className={`p-3 rounded-lg mb-4 ${
+                  inviteStatus.type === 'success' 
+                    ? 'bg-green-50 text-green-800 border border-green-200' 
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}>
+                  <p className="text-sm">{inviteStatus.message}</p>
+                </div>
+              )}
+
+              {/* Waitlist Table */}
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="w-8 h-8 border-4 border-[#9ca571] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-sm text-[#8b7764] mt-3">Loading waitlist...</p>
+                </div>
+              ) : waitlistUsers.length === 0 ? (
+                <div className="text-center py-12 text-[#8b7764]">
+                  <UserPlus className="w-16 h-16 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No users in waitlist</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#f5f0ed] text-[#6b5949] text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="px-3 py-2 w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedWaitlistUsers.length === waitlistUsers.filter(u => u.status === 'pending').length && waitlistUsers.filter(u => u.status === 'pending').length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedWaitlistUsers(waitlistUsers.filter(u => u.status === 'pending').map(u => u.email));
+                              } else {
+                                setSelectedWaitlistUsers([]);
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                        </th>
+                        <th className="px-3 py-2">Name</th>
+                        <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">Phone</th>
+                        <th className="px-3 py-2 text-center">Status</th>
+                        <th className="px-3 py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e8dfd8]">
+                      {waitlistUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-[#faf9f7] transition-colors">
+                          <td className="px-3 py-2.5">
+                            {user.status === 'pending' && (
+                              <input
+                                type="checkbox"
+                                checked={selectedWaitlistUsers.includes(user.email)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedWaitlistUsers([...selectedWaitlistUsers, user.email]);
+                                  } else {
+                                    setSelectedWaitlistUsers(selectedWaitlistUsers.filter(email => email !== user.email));
+                                  }
+                                }}
+                                className="w-4 h-4"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="font-medium text-[#3d2f28]">{user.name} {user.surname}</div>
+                          </td>
+                          <td className="px-3 py-2.5 text-[#6b5949]">{user.email}</td>
+                          <td className="px-3 py-2.5 text-[#6b5949]">{user.mobile}</td>
+                          <td className="px-3 py-2.5 text-center">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              user.status === 'invited' ? 'bg-blue-100 text-blue-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {user.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              {user.status === 'pending' && (
+                                <button
+                                  onClick={() => handleSendInvites([user.email], false)}
+                                  disabled={isSendingInvites}
+                                  className="p-1.5 hover:bg-[#9ca571] hover:text-white rounded transition-colors disabled:opacity-50"
+                                  title="Send invite"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteWaitlistUser(user.email)}
+                                className="p-1.5 hover:bg-red-100 hover:text-red-600 rounded transition-colors"
+                                title="Remove from waitlist"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Bulk Waitlist Upload */}
+            <BulkWaitlistUpload onUploadComplete={fetchWaitlistUsers} />
+
+            {/* Instructions */}
+            <div className="bg-gradient-to-br from-[#f8f9f4] to-[#f5f0ed] rounded-xl p-4 border border-[#e8e6e3]">
+              <h3 className="text-sm font-semibold text-[#3d2f28] mb-2">How It Works</h3>
+              <ul className="space-y-2 text-xs text-[#6b5949]">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#9ca571] font-bold">1.</span>
+                  <span>Select users and click "Send Invites" or use individual send buttons</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#9ca571] font-bold">2.</span>
+                  <span>Each user receives an email with a unique redemption code</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#9ca571] font-bold">3.</span>
+                  <span>The email includes a link to book their first FREE session with an 8-class package purchase</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#9ca571] font-bold">4.</span>
+                  <span>Users can present their redemption code at the studio for verification</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Email Confirmation Modal */}
@@ -896,23 +1295,38 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                         <p className="text-xs text-[#8b7764]">Code: PILATES8</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-[#3d2f28]">3400 DEN</p>
+                        <p className="text-sm text-[#3d2f28]">3500 DEN</p>
                         <p className="text-xs text-[#9ca571] font-medium">Recommended</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {selectedUser.packageType === 'package4' && (
+                {selectedUser.packageType === 'package8' && (
                   <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">4 Sessions</p>
-                        <p className="text-xs text-[#8b7764]">Code: WELLNEST2025</p>
+                        <p className="text-sm text-[#3d2f28] font-medium">8 Sessions</p>
+                        <p className="text-xs text-[#8b7764]">Code: WELLNEST8</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-[#3d2f28]">1800 DEN</p>
-                        <p className="text-xs text-[#9ca571] font-medium">Starter</p>
+                        <p className="text-sm text-[#3d2f28]">3500 DEN</p>
+                        <p className="text-xs text-[#9ca571] font-medium">Basic</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedUser.packageType === 'package10' && (
+                  <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-[#3d2f28] font-medium">10 Sessions</p>
+                        <p className="text-xs text-[#8b7764]">Code: WELLNEST10</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-[#3d2f28]">4200 DEN</p>
+                        <p className="text-xs text-[#9ca571] font-medium">Recommended</p>
                       </div>
                     </div>
                   </div>

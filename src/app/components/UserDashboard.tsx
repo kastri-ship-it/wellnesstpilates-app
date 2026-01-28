@@ -212,8 +212,8 @@ export function UserDashboard({ onBack, language, sessionToken, userEmail }: Use
 
   const getPackageDisplayName = (packageType: string): string => {
     const typeMap: Record<string, string> = {
-      'package4': t.package4Classes || '4 Classes Package',
       'package8': t.package8Classes || '8 Classes Package',
+      'package10': t.package10Classes || '10 Classes Package',
       'package12': t.package12Classes || '12 Classes Package',
       '1class': t.individual1Class || '1 Individual Class',
       '8classes': t.individual8Classes || '8 Individual Classes',
