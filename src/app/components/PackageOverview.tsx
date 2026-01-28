@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, CheckCircle, X, Calendar, Clock, Package } from 'lucide-react';
 import { Language, translations } from '@/app/translations';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
-import logo from 'figma:asset/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
 
 type PackageOverviewProps = {
   onBack: () => void;

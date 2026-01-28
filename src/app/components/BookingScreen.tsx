@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, User, ArrowLeft, Loader } from 'lucide-react';
 import { Language, translations } from '../translations';
-import logo from 'figma:asset/d3b087d995c1120c4f6f827938a39596d087b710.png';
-import rinaPhoto from 'figma:asset/7445e71f9c8b9f5d6e67e1623738c44a5a2d17f6.png';
+import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import rinaPhoto from '../../assets/7445e71f9c8b9f5d6e67e1623738c44a5a2d17f6.png';
 
 type BookingScreenProps = {
   trainingType?: 'single' | 'package' | 'individual';

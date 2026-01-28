@@ -1,7 +1,7 @@
 import { ChevronLeft, Award, Briefcase } from 'lucide-react';
 import { Language, translations } from '../translations';
-import logo from 'figma:asset/d3b087d995c1120c4f6f827938a39596d087b710.png';
-import rinaPhoto from 'figma:asset/2747ea72ef6b5ae1a5cdaf469d96b6ca8cb7d30f.png';
+import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import rinaPhoto from '../../assets/2747ea72ef6b5ae1a5cdaf469d96b6ca8cb7d30f.png';
 
 type InstructorProfileProps = {
   onBack: () => void;

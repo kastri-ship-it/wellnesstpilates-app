@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, LogOut, Mail, X, CheckCircle, Trash2, Ban, Gift, ShieldAlert, Settings, UserPlus, Send } from 'lucide-react';
-import logo from 'figma:asset/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { DevTools } from './DevTools';
 import { BulkWaitlistUpload } from './BulkWaitlistUpload';
