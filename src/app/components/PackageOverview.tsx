@@ -49,6 +49,8 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
     email: '',
     payInStudio: true,
   });
+  const [couponCode, setCouponCode] = useState('');
+  const [couponValidation, setCouponValidation] = useState<{status: 'idle' | 'validating' | 'valid' | 'invalid', message?: string}>({ status: 'idle' });
 
   // New 2-step flow state
   const [showPackageCreatedPopup, setShowPackageCreatedPopup] = useState(false);
@@ -91,6 +93,62 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       setExpandedPackage(null);
     } else {
       setExpandedPackage(packageType);
+      // Reset coupon validation when switching packages
+      setCouponCode('');
+      setCouponValidation({ status: 'idle' });
+    }
+  };
+
+  // Validate coupon code
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponValidation({ status: 'idle' });
+      return;
+    }
+
+    setCouponValidation({ status: 'validating' });
+
+    try {
+      console.log('🔍 Validating coupon:', couponCode.trim());
+      console.log('📡 API URL:', `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/validate-coupon`);
+      
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/validate-coupon`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({
+            code: couponCode.trim(),
+          }),
+        }
+      );
+
+      console.log('📥 Response status:', response.status);
+      const data = await response.json();
+      console.log('📦 Response data:', data);
+
+      if (data.valid) {
+        console.log('✅ Coupon is valid!');
+        setCouponValidation({ 
+          status: 'valid', 
+          message: t.couponValid || '✓ Valid coupon! +1 free class' 
+        });
+      } else {
+        console.log('❌ Coupon is invalid:', data.error);
+        setCouponValidation({ 
+          status: 'invalid', 
+          message: data.error || t.couponInvalid || 'Invalid or expired coupon code' 
+        });
+      }
+    } catch (error) {
+      console.error('💥 Error validating coupon:', error);
+      setCouponValidation({ 
+        status: 'invalid', 
+        message: t.couponError || 'Error validating coupon' 
+      });
     }
   };
 
@@ -121,6 +179,7 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
             mobile: formData.mobile,
             email: formData.email,
             language: language,
+            couponCode: couponValidation.status === 'valid' ? couponCode.trim() : undefined,
           }),
         }
       );
@@ -223,7 +282,7 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
           const available = hasPrivateSession ? 0 : Math.max(0, maxCapacity - seatsOccupied);
           
           // Filter out past time slots for today
-          const isToday = date.toDateString() === today.toDateString();
+          const isToday = date.toDateString() === now.toDateString();
           const isPastTime = isToday && (() => {
             const [hours, minutes] = time.split(':').map(Number);
             const slotTime = new Date(now);
@@ -355,6 +414,8 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
         email: '',
         payInStudio: true,
       });
+      setCouponCode('');
+      setCouponValidation({ status: 'idle' });
 
       // Show success popup
       setShowSuccessPopup(true);
@@ -406,6 +467,8 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       email: '',
       payInStudio: true,
     });
+    setCouponCode('');
+    setCouponValidation({ status: 'idle' });
 
     // Auto-close after 5 seconds
     setTimeout(() => {
@@ -812,6 +875,51 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
                     placeholder={t.emailPlaceholder}
                     className="w-full px-4 py-2.5 rounded-xl bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6] text-sm text-[#3d2f28] placeholder:text-[#8b7764]/60 focus:outline-none focus:ring-2 focus:ring-[#9ca571]/50 focus:bg-white transition-all shadow-inner border border-[#e8e6e3]/50"
                   />
+                </div>
+
+                {/* Coupon Code Section */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#6b5949] mb-1.5 tracking-wide">
+                    {t.couponCode || 'Coupon Code'} <span className="font-normal text-[#8b7764]/60">({t.optional || 'Optional'})</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase());
+                        setCouponValidation({ status: 'idle' });
+                      }}
+                      placeholder={t.couponPlaceholder || 'Enter code'}
+                      className={`flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6] text-sm text-[#3d2f28] placeholder:text-[#8b7764]/60 focus:outline-none focus:ring-2 transition-all shadow-inner border ${
+                        couponValidation.status === 'valid' 
+                          ? 'border-green-500 focus:ring-green-500/50' 
+                          : couponValidation.status === 'invalid'
+                          ? 'border-red-500 focus:ring-red-500/50'
+                          : 'border-[#e8e6e3]/50 focus:ring-[#9ca571]/50'
+                      } focus:bg-white uppercase`}
+                    />
+                    <button
+                      type="button"
+                      onClick={validateCoupon}
+                      disabled={!couponCode.trim() || couponValidation.status === 'validating'}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#9ca571] to-[#8a9463] text-white rounded-xl text-xs font-semibold hover:shadow-lg hover:shadow-[#9ca571]/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {couponValidation.status === 'validating' ? '...' : (t.apply || 'Apply')}
+                    </button>
+                  </div>
+                  {couponValidation.status === 'valid' && (
+                    <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      {couponValidation.message}
+                    </p>
+                  )}
+                  {couponValidation.status === 'invalid' && (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
+                      <X className="w-3 h-3" />
+                      {couponValidation.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6] rounded-xl p-3.5 border border-[#e8e6e3]/50 shadow-inner">

@@ -1,3 +1,11 @@
+import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
+
+// Supabase client for direct table queries
+const getSupabase = () => createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
@@ -54,8 +62,22 @@ const STUDIO_INFO = {
 
 const EMAIL_TRANSLATIONS = {
   EN: {
+    greeting: 'Hello',
     bookingConfirmation: 'Booking Confirmation',
-    thankYou: 'Thank you for your booking!',
+    thankYou: 'Thank you for registering on our waitlist. Reservations are now open.',
+    gratitude: 'As a thank you, you have received a special bonus. Enter the code at checkout when purchasing a package.',
+    bonusTitle: 'WAITLIST BENEFIT',
+    bonusDescription: '1 bonus class added after purchasing an 8+ class package',
+    bonusNote: 'Pay for 8, get 9 classes',
+    exclusions: 'Not valid for single, 1-on-1, or duo classes.',
+    personalCode: 'YOUR PERSONAL CODE',
+    validPackages: 'Valid for packages 8, 10, or 12. Valid only 50 days. Not shareable.',
+    redeem: 'Redeem Package',
+    howToRedeem: 'How to redeem the code',
+    step1: 'Open packages',
+    step2: 'Redeem packages 8, 10, or 12',
+    step3: 'At checkout, enter the code to receive 1 bonus class',
+    needHelp: 'Need help with the code? Contact us at',
     bookingDate: 'Booking Date',
     yourSession: 'Your Session',
     date: 'Date',
@@ -67,8 +89,22 @@ const EMAIL_TRANSLATIONS = {
     subject: 'Booking Confirmation - WellNest Pilates',
   },
   SQ: {
+    greeting: 'Përshëndetje',
     bookingConfirmation: 'Konfirmim Rezervimi',
-    thankYou: 'Faleminderit për rezervimin tuaj!',
+    thankYou: 'Faleminderit që u regjistruat në listën tonë të pritjes. Rezervimet tani janë të hapura.',
+    gratitude: 'Si falënderim, keni përfituar një bonus të veçantë. Vendosni kodin në checkout gjatë blerjes së paketës.',
+    bonusTitle: 'PËRFITIMI I LISTËS SË PRITJES',
+    bonusDescription: '1 seancë bonus shtohet vetëm pasi blini paketë me 8 ose më shumë',
+    bonusNote: 'Paguani 8, merrni 9 seanca',
+    exclusions: 'Nuk vlen për seancë teke, 1 on 1, ose duo.',
+    personalCode: 'KODI JUAJ PERSONAL',
+    validPackages: 'Vlen per paketat 8, 10, ose 12. Vlen vetëm 50 ditë. Nuk përdoret.',
+    redeem: 'Zgjedh paketën',
+    howToRedeem: 'Si ta përdorni kodin',
+    step1: 'Hapni faqen e paketave',
+    step2: 'Zgjedhni paketat 8, 10, ose 12',
+    step3: 'Në checkout, vendosni kodin për të marrë 1 seancë bonus',
+    needHelp: 'Nëse keni problem me kodin, na shkruani tek',
     bookingDate: 'Data e Rezervimit',
     yourSession: 'Seanca Juaj',
     date: 'Data',
@@ -80,8 +116,22 @@ const EMAIL_TRANSLATIONS = {
     subject: 'Konfirmim Rezervimi - WellNest Pilates',
   },
   MK: {
+    greeting: 'Здраво',
     bookingConfirmation: 'Потврда за резервација',
-    thankYou: 'Ви благодариме за вашата резервација!',
+    thankYou: 'Ви благодариме што се регистриравте на нашата листа на чекање. Резервациите сега се отворени.',
+    gratitude: 'Како благодарност, добивте специјален бонус. Внесете го кодот при плаќање кога купувате пакет.',
+    bonusTitle: 'БЕНЕФИТ ОД ЛИСТАТА НА ЧЕКАЊЕ',
+    bonusDescription: '1 бонус час се додава само ако купите пакет со 8 или повеќе',
+    bonusNote: 'Платете 8, добијте 9 часови',
+    exclusions: 'Не важи за поединечни, 1 на 1, или дуо часови.',
+    personalCode: 'ВАШ ЛИЧЕН КОД',
+    validPackages: 'Важи за пакети 8, 10, или 12. Важи само 50 дена. Не се споделува.',
+    redeem: 'Искористи пакет',
+    howToRedeem: 'Како да го искористите кодот',
+    step1: 'Отворете ја страната со пакети',
+    step2: 'Изберете пакети 8, 10, или 12',
+    step3: 'При плаќање, внесете го кодот за да добиете 1 бонус час',
+    needHelp: 'Ако имате проблем со кодот, контактирајте нѐ на',
     bookingDate: 'Датум на резервација',
     yourSession: 'Вашата сесија',
     date: 'Датум',
@@ -212,9 +262,16 @@ async function calculateSlotCapacity(dateKey: string, timeSlot: string): Promise
 function getEmailHeader(): string {
   return `
     <tr>
-      <td style="background-color: #9ca571; padding: 40px 40px 30px 40px; text-align: center;">
-        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">${STUDIO_INFO.name}</h1>
-        <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px; opacity: 0.9;">${STUDIO_INFO.address}</p>
+      <td style="background-color: #3d2f28; padding: 60px 40px; text-align: center;">
+        <div style="font-family: 'Georgia', serif; color: #ffffff; font-size: 48px; font-weight: 300; letter-spacing: 6px; margin-bottom: 20px;">
+          WELLNEST
+        </div>
+        <div style="color: #d4c5b9; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px;">
+          ESTD. &nbsp;&nbsp; PILATES STUDIO &nbsp;&nbsp; 2025
+        </div>
+        <div style="color: #d4c5b9; font-size: 11px; letter-spacing: 1px;">
+          ${STUDIO_INFO.address}
+        </div>
       </td>
     </tr>
   `;
@@ -269,33 +326,49 @@ function buildEmailTemplate(content: string, language: string = 'EN'): string {
 async function sendEmail(to: string, subject: string, htmlContent: string, language: string = 'EN') {
   const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
   if (!RESEND_API_KEY) {
-    console.error('RESEND_API_KEY not configured');
-    throw new Error('Email service not configured');
+    console.error('⚠️ RESEND_API_KEY not configured - email not sent');
+    return { success: false, error: 'Email service not configured' };
   }
 
-  const emailResponse = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: `${STUDIO_INFO.name} <onboarding@resend.dev>`,
-      to: [to],
-      subject,
-      html: buildEmailTemplate(htmlContent, language),
-    }),
-  });
+  try {
+    const emailResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${STUDIO_INFO.name} <${STUDIO_INFO.email}>`,
+        to: [to],
+        subject,
+        html: buildEmailTemplate(htmlContent, language),
+      }),
+    });
 
-  if (!emailResponse.ok) {
-    const errorText = await emailResponse.text();
-    console.error('Email sending failed:', errorText);
-    throw new Error(`Failed to send email: ${errorText}`);
+    if (!emailResponse.ok) {
+      const errorText = await emailResponse.text();
+      const errorData = JSON.parse(errorText);
+      
+      // Check if it's a domain verification issue
+      if (errorData.statusCode === 403 && errorData.name === 'validation_error') {
+        console.warn(`⚠️ EMAIL NOT SENT: Domain may not be verified in Resend`);
+        console.warn(`   Attempted to send from: ${STUDIO_INFO.email} to: ${to}`);
+        console.warn(`   📝 To enable production emails: Verify your domain at resend.com/domains`);
+        console.warn(`   📝 Or add the recipient email as a verified sender at resend.com`);
+        return { success: false, error: 'Domain verification required', testMode: true };
+      }
+      
+      console.error('❌ Email sending failed:', errorText);
+      return { success: false, error: `Failed to send email: ${errorText}` };
+    }
+
+    const result = await emailResponse.json();
+    console.log('✅ Email sent successfully to:', to, 'in language:', language);
+    return { success: true, result };
+  } catch (error) {
+    console.error('❌ Email error:', error);
+    return { success: false, error: error.message };
   }
-
-  const result = await emailResponse.json();
-  console.log('Email sent successfully to:', to, 'in language:', language);
-  return result;
 }
 
 async function sendActivationEmail(
@@ -389,7 +462,9 @@ async function sendRegistrationEmail(
   firstSessionTime: string,
   firstSessionEndTime: string,
   appUrl: string,
-  language: string = 'EN'
+  language: string = 'EN',
+  bonusClasses: number = 0,
+  redemptionCode: string = ''
 ) {
   // Normalize language to uppercase and default to EN if invalid
   const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
@@ -404,6 +479,8 @@ async function sendRegistrationEmail(
     minute: '2-digit'
   });
 
+  const bonusHtml = bonusClasses > 0 ? `<div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 24px 0; border: 2px solid #86efac;"><h3 style="margin: 0 0 12px 0; color: #16a34a; font-size: 18px;">🎁 Bonus Redeemed!</h3><p style="margin: 0; color: #15803d; font-size: 15px; font-weight: bold;">+${bonusClasses} Free Class Added!</p><p style="margin: 8px 0 0 0; color: #166534; font-size: 14px;">Your coupon has been successfully redeemed.</p></div>` : '';
+
   const content = `
     <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.bookingConfirmation}</h2>
     
@@ -414,6 +491,8 @@ async function sendRegistrationEmail(
     <p style="margin: 0 0 20px 0; color: #8b7764; font-size: 14px;">
       <strong>${t.bookingDate}:</strong> ${currentDate}
     </p>
+    
+    ${bonusHtml}
     
     <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
       <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${t.yourSession}</h3>
@@ -444,12 +523,136 @@ app.get("/make-server-b87b0c07/health", (c) => {
   return c.json({ status: "ok", model: "unified_package_reservation" });
 });
 
+// ============ COUPON VALIDATION ENDPOINT ============
+
+app.post("/make-server-b87b0c07/validate-coupon", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { code } = body;
+
+    if (!code || typeof code !== 'string') {
+      return c.json({ valid: false, error: "Invalid coupon code format" });
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+    console.log(`🔍 Looking for coupon: ${normalizedCode}`);
+    
+    // Query redemption_codes table DIRECTLY (not kv_store!)
+    const supabase = getSupabase();
+    const { data: coupon, error } = await supabase
+      .from('redemption_codes')
+      .select('*')
+      .eq('code', normalizedCode)
+      .maybeSingle();
+
+    if (error) {
+      console.error('❌ Database error:', error);
+      return c.json({ valid: false, error: "Database error" }, 500);
+    }
+
+    if (!coupon) {
+      return c.json({ valid: false, error: "Coupon not found" });
+    }
+
+    console.log(`✅ Coupon found:`, coupon);
+    
+    return c.json({ 
+      valid: true, 
+      message: "Valid coupon! You'll receive +1 free class",
+      bonusClasses: 1
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    return c.json({ valid: false, error: 'Server error' }, 500);
+  }
+});
+
+// ============ COUPON VALIDATION ENDPOINT ============
+
+app.post("/make-server-b87b0c07/validate-coupon", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { code } = body;
+
+    if (!code || typeof code !== 'string') {
+      console.log('❌ Coupon validation failed: Invalid format');
+      return c.json({ valid: false, error: "Invalid coupon code format" });
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+    console.log(`🔍 Looking for coupon code in redemption_codes table: ${normalizedCode}`);
+    
+    // Query the redemption_codes table directly
+    const supabase = getSupabase();
+    const { data: coupon, error } = await supabase
+      .from('redemption_codes')
+      .select('*')
+      .eq('code', normalizedCode)
+      .maybeSingle();
+
+    if (error) {
+      console.error('❌ Database error:', error);
+      return c.json({ valid: false, error: "Database error" }, 500);
+    }
+
+    if (!coupon) {
+      console.log(`❌ Coupon not found in redemption_codes table: ${normalizedCode}`);
+      return c.json({ valid: false, error: "Coupon not found" });
+    }
+
+    console.log(`📋 Coupon found:`, JSON.stringify(coupon, null, 2));
+
+    // Check if coupon is already used
+    if (coupon.used === true || coupon.status === 'used' || coupon.status === 'redeemed') {
+      console.log(`❌ Coupon already used: ${normalizedCode}`);
+      return c.json({ valid: false, error: "Coupon already redeemed" });
+    }
+
+    // Check if coupon is expired (check multiple possible column names)
+    const expiresAt = coupon.expires_at || coupon.expiresAt;
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      console.log(`❌ Coupon expired: ${normalizedCode}, expiresAt: ${expiresAt}`);
+      return c.json({ valid: false, error: "Coupon expired" });
+    }
+
+    // Check if coupon is active (if status column exists)
+    if (coupon.status && coupon.status !== 'active') {
+      console.log(`❌ Coupon not active: ${normalizedCode}, status: ${coupon.status}`);
+      return c.json({ valid: false, error: "Coupon not active" });
+    }
+
+    console.log(`✅ Coupon valid: ${normalizedCode}`);
+
+    // Determine bonus based on offer_type
+    let bonusClasses = 1;
+    let message = "Valid coupon! You'll receive +1 free class";
+    
+    if (coupon.offer_type === 'first_class_free_with_8pack') {
+      bonusClasses = 1;
+      message = "Valid coupon! You'll receive +1 free class with your 8-pack";
+    }
+
+    return c.json({ 
+      valid: true, 
+      message,
+      bonusClasses,
+      couponId: coupon.id,
+      offerType: coupon.offer_type
+    });
+
+  } catch (error) {
+    console.error('Error validating coupon:', error);
+    return c.json({ valid: false, error: 'Server error validating coupon' }, 500);
+  }
+});
+
 // ============ PACKAGE ENDPOINTS ============
 
 app.post("/make-server-b87b0c07/packages", async (c) => {
   try {
     const body = await c.req.json();
-    const { userId, packageType, name, surname, mobile, email, language, paymentToken } = body;
+    const { userId, packageType, name, surname, mobile, email, language, paymentToken, couponCode } = body;
 
     if (!userId || !packageType || !name || !surname || !mobile || !email) {
       return c.json({ error: "Missing required fields" }, 400);
@@ -483,7 +686,57 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
     }
 
     const packageId = `package:${normalizedEmail}:${Date.now()}`;
-    const totalSessions = extractSessionCount(packageType);
+    let totalSessions = extractSessionCount(packageType);
+    let bonusClasses = 0;
+    let redeemedCouponCode = null;
+
+    // Handle coupon redemption - Query redemption_codes table directly
+    if (couponCode) {
+      const normalizedCoupon = couponCode.trim().toUpperCase();
+      console.log(`🔍 Checking coupon for redemption: ${normalizedCoupon}`);
+      
+    // Query redemption_codes table directly (NOT kv_store!)
+      const supabase = getSupabase();
+      const { data: coupon, error: couponError } = await supabase
+        .from('redemption_codes')
+        .select('*')
+        .eq('code', normalizedCoupon)
+        .maybeSingle();
+
+      if (coupon && !couponError) {
+        const isUsed = coupon.used === true || coupon.status === 'used' || coupon.status === 'redeemed';
+        const expiresAt = coupon.expires_at || coupon.expiresAt;
+        const isExpired = expiresAt && new Date(expiresAt) < new Date();
+        const isActive = !coupon.status || coupon.status === 'active';
+
+        if (!isUsed && !isExpired && isActive) {
+          bonusClasses = 1;
+          totalSessions += bonusClasses;
+          redeemedCouponCode = normalizedCoupon;
+          
+          const { error: updateError } = await supabase
+            .from('redemption_codes')
+            .update({
+              used: true,
+              status: 'redeemed',
+              used_at: new Date().toISOString(),
+              used_by_email: normalizedEmail,
+              package_id: packageId
+            })
+            .eq('id', coupon.id);
+          
+          if (updateError) {
+            console.error('Failed to mark coupon as used:', updateError);
+          } else {
+            console.log(`✅ Coupon ${normalizedCoupon} redeemed by ${normalizedEmail}. +${bonusClasses} bonus class(es)`);
+          }
+        } else {
+          console.log(`⚠️ Coupon ${normalizedCoupon} not valid: used=${isUsed}, expired=${isExpired}, active=${isActive}`);
+        }
+      } else {
+        console.log(`⚠️ Coupon ${normalizedCoupon} not found in redemption_codes table`);
+      }
+
     const activationCode = generateActivationCode();
     const codeKey = `activation_code:${activationCode}`;
     const codeExpiry = new Date();
@@ -510,6 +763,9 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
       packageType,
       totalSessions,
       remainingSessions: totalSessions,
+      baseSessions: extractSessionCount(packageType), // Original sessions without bonus
+      bonusClasses, // Bonus classes from coupon
+      redeemedCouponCode, // The coupon code that was redeemed
       sessionsBooked: [],
       sessionsAttended: [],
       purchaseDate: new Date().toISOString(),
@@ -553,7 +809,11 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
       packageId,
       activationCode,
       requiresFirstSessionBooking: true,
-      message: "Package created. Please select date and time for your first session."
+      bonusClasses,
+      redeemedCoupon: redeemedCouponCode,
+      message: bonusClasses > 0 
+        ? `Package created with +${bonusClasses} bonus class! Please select date and time for your first session.`
+        : "Package created. Please select date and time for your first session."
     });
 
   } catch (error) {
@@ -694,7 +954,9 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
           timeSlot,
           endTime,
           appUrl,
-          pkg.language
+          pkg.language,
+          pkg.bonusClasses || 0,
+          pkg.redeemedCouponCode || ''
         );
         console.log(`Registration email sent to: ${pkg.email} in language: ${pkg.language}`);
       }
@@ -1007,7 +1269,9 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
             timeSlot,
             endTime,
             appUrl,
-            language
+            language,
+            0, // Single sessions don't have coupons
+            '' // No redemption code for single sessions
           );
         }
       } catch (emailError) {
@@ -2505,7 +2769,7 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
           redeemSteps: [
             'Посетете не или контактирајте не за да ја резервирате вашата прва сесија',
             'Изберете датум и време за вашата прва сесија',
-            'Комплетирајте ја купувањето на пакетот од 8 ча��а',
+            'Комплетирајте ја купувањето на пакетот од 8 часа',
             'Вашата прва сесија е бесплатна!'
           ],
           codeLabel: 'Вашиот код за искористување:',
@@ -3033,12 +3297,8 @@ app.post('/make-server-b87b0c07/upload-logo', async (c) => {
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = new Uint8Array(arrayBuffer);
     
-    // Create Supabase client with service role key
-    const { createClient } = await import('npm:@supabase/supabase-js');
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // Use the existing Supabase client
+    const supabase = getSupabase();
     
     // Ensure assets bucket exists and is public
     const bucketName = 'assets';
@@ -3091,5 +3351,17 @@ app.post('/make-server-b87b0c07/upload-logo', async (c) => {
     return c.json({ error: 'Failed to upload logo', details: error.message }, 500);
   }
 });
+
+// ============ SERVER STARTUP ============
+
+console.log('🚀 WellNest Pilates Server Starting...');
+console.log('📧 Email Configuration:');
+const hasResendKey = !!Deno.env.get('RESEND_API_KEY');
+console.log(`   - RESEND_API_KEY: ${hasResendKey ? '✅ Configured' : '❌ Missing'}`);
+if (hasResendKey) {
+  console.log(`   - From address: ${STUDIO_INFO.email}`);
+  console.log('   - Emails will be sent to all addresses');
+  console.log('   - Note: If domain not verified, verify at resend.com/domains');
+}
 
 Deno.serve(app.fetch);

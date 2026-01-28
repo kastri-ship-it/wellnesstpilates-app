@@ -1,6 +1,8 @@
 import { ChevronLeft, Award, Briefcase } from 'lucide-react';
 import { Language, translations } from '../translations';
-import { logo, rinaProfilePhoto as rinaPhoto } from '../../assets/images';
+import { logo } from '../../assets/images';
+
+const rinaPhoto = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=600&fit=crop';
 
 type InstructorProfileProps = {
   onBack: () => void;

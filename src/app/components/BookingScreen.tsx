@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, User, ArrowLeft, Loader } from 'lucide-react';
 import { Language, translations } from '../translations';
-import { logo, rinaInstructorPhoto as rinaPhoto } from '../../assets/images';
+import { logo } from '../../assets/images';
+
+const rinaPhoto = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=600&fit=crop';
 
 type BookingScreenProps = {
   trainingType?: 'single' | 'package' | 'individual';

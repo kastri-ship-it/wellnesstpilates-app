@@ -75,10 +75,19 @@ export const translations = {
     emailPlaceholder: 'email@shembull.com',
     paymentMethod: 'Metoda e pagesës',
     payInStudio: 'Paguaj në studio (e vetmja metodë)',
-    payInStudioDesc: 'Pagesa në para ose me kartë në studio - kjo është e vetmja metodë e pagesës e disponueshme',
+    payInStudioDesc: 'Pagesa n�� para ose me kartë në studio - kjo është e vetmja metodë e pagesës e disponueshme',
     confirmBooking: 'KONFIRMO REZERVIMIN',
     submitting: 'Duke konfirmuar...',
     back: 'Kthehu',
+    
+    // Coupon/Redemption Code
+    couponCode: 'Kodi i kuponit',
+    optional: 'Opsionale',
+    couponPlaceholder: 'Fut kodin',
+    apply: 'Apliko',
+    couponValid: '✓ Kupon i vlefshëm! +1 klasë falas',
+    couponInvalid: 'Kodi i kuponit i pavlefshëm ose i skaduar',
+    couponError: 'Gabim gjatë verifikimit të kuponit',
     
     // Success Screen
     reservationConfirmed: 'Rezervimi u konfirmua!',
@@ -207,7 +216,7 @@ export const translations = {
     individual1ClassDesc: 'Një klasë individuale',
     duo1ClassDesc: 'Një klasë duo',
     individual8ClassDesc: 'Paketë me 8 klasë',
-    individual12ClassDesc: 'Paketë me 12 klasë',
+    individual12ClassDesc: 'Paket�� me 12 klasë',
     classDuration: '50 min',
     validityPeriod: 'E vlefshme 35 ditë',
     privateStudio: 'Studio privat i përfshirë',
@@ -367,6 +376,15 @@ export const translations = {
     submitting: 'Потврдување...',
     back: 'Назад',
     
+    // Coupon/Redemption Code
+    couponCode: 'Купонски код',
+    optional: 'Опционално',
+    couponPlaceholder: 'Внесете код',
+    apply: 'Примени',
+    couponValid: '✓ Валиден купон! +1 бесплатен час',
+    couponInvalid: 'Невалиден или истечен купонски код',
+    couponError: 'Грешка при проверка на купонот',
+    
     // Success Screen
     reservationConfirmed: 'Резервацијата е потврдена!',
     successMessage: 'Вашата резервација е успешно регистрирана. Наскоро ќе добиете потврден емаил.',
@@ -382,7 +400,7 @@ export const translations = {
     certifications: 'Сертификати',
     experience: 'Искуство',
     backToBooking: 'Назад кон резервација',
-    instructorBio: 'Рина е сертифициран Пилатес инструктор со над 8 години искуство во reformer, mat и aerial Pilates. Таа има страст за помагање на клиентите да ги постигнат своите фитнес и wellness ц��ли пеку свесно движење и правилни техники на дишење.',
+    instructorBio: 'Рина е сертифициран Пилатес инструктор со над 8 години искуство во reformer, mat и aerial Pilates. Таа има страст за помагање на клиентите да ги постигнат своите фитнес и wellness ц��ли пеку све��но движење и правилни техники на дишење.',
     cert1: 'Сертифициран Comprehensive Pilates инструктор',
     cert2: 'Сертифициран Reformer специјалист',
     cert3: 'Сертифициран Aerial Pilates инструктор',
@@ -422,7 +440,7 @@ export const translations = {
     // Date formatting
     mondayDate: 'Понеделник, 13 Јануари',
     tuesdayDate: 'Вторник, 14 Јануари',
-    wednesdayDate: 'Среда, 15 Јануари',
+    wednesdayDate: 'Ср��да, 15 Јануари',
     thursdayDate: 'Четврток, 16 Ја��уари',
     fridayDate: 'Петок, 17 Јануари',
     
@@ -539,7 +557,7 @@ export const translations = {
     save: 'Зачувај',
     accountInfo: 'Информации за сметка',
     memberSince: 'Член од',
-    currentPackage: 'Те��овен пакет',
+    currentPackage: 'Те��о��ен пакет',
     noPackage: 'Не��а активен пакет',
     overview: 'Преглед',
     bookings: 'Ре��ервации',
@@ -653,6 +671,15 @@ export const translations = {
     confirmBooking: 'CONFIRM BOOKING',
     submitting: 'Confirming...',
     back: 'Back',
+    
+    // Coupon/Redemption Code
+    couponCode: 'Coupon Code',
+    optional: 'Optional',
+    couponPlaceholder: 'Enter code',
+    apply: 'Apply',
+    couponValid: '✓ Valid coupon! +1 free class',
+    couponInvalid: 'Invalid or expired coupon code',
+    couponError: 'Error validating coupon',
     
     // Success Screen
     reservationConfirmed: 'Reservation confirmed!',

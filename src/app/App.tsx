@@ -1,5 +1,6 @@
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { MainApp } from '@/app/components/MainApp';
+import { CouponDebugPanel } from '@/app/components/CouponDebugPanel';
 
 // Booking data type definition
 export type BookingData = {
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <LanguageProvider>
       <MainApp />
+      <CouponDebugPanel />
     </LanguageProvider>
   );
 }
