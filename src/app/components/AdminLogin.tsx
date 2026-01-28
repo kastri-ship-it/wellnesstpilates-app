@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Lock, ArrowLeft } from 'lucide-react';
-import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import { logo } from '../../assets/images';
 
 type AdminLoginProps = {
   onLogin: () => void;

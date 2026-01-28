@@ -2,7 +2,7 @@ import { X, Loader } from 'lucide-react';
 import { useState } from 'react';
 import { Language, translations } from '../translations';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
-import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import { logo } from '../../assets/images';
 
 type LoginRegisterModalProps = {
   onClose: () => void;

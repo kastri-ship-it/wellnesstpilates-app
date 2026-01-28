@@ -1,10 +1,12 @@
 import { ChevronRight, Globe, User } from 'lucide-react';
 import { Language, translations } from '../translations';
-import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
-import multiPackageImage from '../../assets/2c1eeb2e75e0f452aa251557457b3a874ea5a74b.png';
-import singleSessionImage from '../../assets/f0da4874fe95616874cda9d658bb1a76d497723b.png';
-import individualTrainingImage from '../../assets/ce594fb19f04566945127ac6bb9cc1857aeabad0.png';
-import duoTrainingImage from '../../assets/c54203056899e7adcd43953190be9a37d5f33fe4.png';
+import { 
+  logo, 
+  multiPackageImage, 
+  singleSessionImage, 
+  individualTrainingImage, 
+  duoTrainingImage 
+} from '../../assets/images';
 
 type TrainingTypeSelectionProps = {
   onSelectType: (type: 'single' | 'package' | 'individual' | 'duo') => void;

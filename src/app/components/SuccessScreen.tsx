@@ -1,7 +1,7 @@
 import { CheckCircle2, ArrowLeft } from 'lucide-react';
 import { BookingData } from '../App';
 import { Language, translations } from '../translations';
-import logo from '../../assets/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import { logo } from '../../assets/images';
 
 type SuccessScreenProps = {
   bookingData: BookingData;
