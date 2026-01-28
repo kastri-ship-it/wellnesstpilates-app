@@ -3011,7 +3011,7 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
         console.log(`📧 Using API key: ${resendApiKey ? 'PRESENT (length: ' + resendApiKey.length + ')' : 'MISSING'}`);
         
         const emailPayload = {
-          from: 'WellNest Pilates <onboarding@resend.dev>',
+          from: process.env.FROM_EMAIL || 'Wellnest Pilates <info@wellnestpilates.com>',
           to: [normalizedEmail],
           subject: t.subject,
           html: emailHtml,
