@@ -55,7 +55,7 @@ const PACKAGE_PRICING = {
 const STUDIO_INFO = {
   name: 'WellNest Pilates',
   address: 'Gjuro Gjakovikj 59, Kumanovo 1300',
-  email: 'info@wellnest-pilates.com',
+  email: 'info@wellnestpilates.com',
 };
 
 // ============ EMAIL TRANSLATIONS ============
@@ -2997,7 +2997,7 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
               <p style="margin: 0; color: #666666; font-size: 12px;">
                 <strong style="color: #333333;">WellNest Pilates</strong><br>
                 Gjuro Gjakovikj 59, Kumanovo 1300<br>
-                <a href="mailto:info@wellnest-pilates.com" style="color: #9ca571; text-decoration: none;">info@wellnest-pilates.com</a>
+                <a href="mailto:info@wellnestpilates.com" style="color: #9ca571; text-decoration: none;">info@wellnestpilates.com</a>
               </p>
             </div>
           </div>
