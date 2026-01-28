@@ -1,11 +1,10 @@
 import { ChevronRight, Globe, User } from 'lucide-react';
 import { Language, translations } from '../translations';
-// Placeholder images - replace with actual images later
-const logo = 'https://azqkguctispoctvmpmci.supabase.co/storage/v1/object/sign/Logo/wellnestpilates_logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8yYjI3MjJkNi04NTZmLTQzZTYtYjI0My0xNTMzM2E4NzAzZWQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJMb2dvL3dlbGxuZXN0cGlsYXRlc19sb2dvLnBuZyIsImlhdCI6MTc2OTU1NjYwNiwiZXhwIjoxODAxMDkyNjA2fQ.JfL5XPlVZtq1oI_abB4H5tGEJqhgB1uRNtwInmlg9KI';
-const multiPackageImage = 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&h=300&fit=crop';
-const singleSessionImage = 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&h=300&fit=crop';
-const individualTrainingImage = 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=300&fit=crop';
-const duoTrainingImage = 'https://images.unsplash.com/photo-1599058917765-a780eda07a3e?w=400&h=300&fit=crop';
+import logo from 'figma:asset/d3b087d995c1120c4f6f827938a39596d087b710.png';
+import multiPackageImage from 'figma:asset/2c1eeb2e75e0f452aa251557457b3a874ea5a74b.png';
+import singleSessionImage from 'figma:asset/f0da4874fe95616874cda9d658bb1a76d497723b.png';
+import individualTrainingImage from 'figma:asset/ce594fb19f04566945127ac6bb9cc1857aeabad0.png';
+import duoTrainingImage from 'figma:asset/c54203056899e7adcd43953190be9a37d5f33fe4.png';
 
 type TrainingTypeSelectionProps = {
   onSelectType: (type: 'single' | 'package' | 'individual' | 'duo') => void;
