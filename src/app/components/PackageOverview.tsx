@@ -60,7 +60,36 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [isBookingFirstSession, setIsBookingFirstSession] = useState(false);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-
+// Send confirmation email
+const sendConfirmationEmail = async (emailData: {
+  to: string;
+  customerName: string;
+  packageType: string;
+  packagePrice: string;
+  bookingDate: string;
+  bookingTime: string;
+}) => {
+  try {
+    const response = await fetch(
+      `https://${projectId}.supabase.co/functions/v1/send-confirmation-email`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify({
+          ...emailData,
+          language: language,
+        }),
+      }
+    );
+    const data = await response.json();
+    console.log('📧 Confirmation email sent:', data);
+  } catch (error) {
+    console.error('❌ Failed to send confirmation email:', error);
+  }
+};
   const packages = [
     {
       type: 'package8' as const,
@@ -378,9 +407,25 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
         return;
       }
 
-      console.log('✅ Package & first session booked successfully!');
+console.log('✅ Package & first session booked successfully!');
+
+      // Send confirmation email
+      const packagePrices: Record<string, string> = {
+        'package8': '3500',
+        'package10': '4200', 
+        'package12': '4800',
+      };
+      await sendConfirmationEmail({
+        to: formData.email,
+        customerName: `${formData.name} ${formData.surname}`,
+        packageType: packageData.packageType.replace('package', ''),
+        packagePrice: packagePrices[packageData.packageType] || '0',
+        bookingDate: dateKey,
+        bookingTime: timeSlot,
+      });
       
       // Check if this is preview mode
+
       if (data.isPreviewMode && data.previewRegistrationLink) {
         console.log('🔧 PREVIEW MODE: Registration link:', data.previewRegistrationLink);
       } else {
