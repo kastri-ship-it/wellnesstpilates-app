@@ -458,13 +458,6 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       }
 
       console.log('Payment status updated successfully:', data);
-      
-      // Also update in bookings array
-      setBookings(prevBookings =>
-        prevBookings.map(booking =>
-          booking.id === bookingId ? { ...booking, status: newStatus } : booking
-        )
-      );
     } catch (error) {
       console.error('Error updating booking status:', error);
       // Revert the change if network error
@@ -491,14 +484,14 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to resend activation code:', errorText);
-        
+
         try {
           const errorData = JSON.parse(errorText);
           alert(errorData.error || 'Failed to resend activation code. Please try again.');
         } catch {
           alert('Failed to resend activation code. The user may not have any active codes.');
         }
-        
+
         setIsSendingEmail(false);
         return;
       }
@@ -512,6 +505,49 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       console.error('Error resending activation code:', error);
       alert('Network error. Please check your connection.');
       setIsSendingEmail(false);
+    }
+  };
+
+  const handleActivatePackage = async (user: User) => {
+    // Confirm activation
+    if (!confirm(`Activate package for ${user.name} ${user.surname}?\n\nThis will:\n- Generate login credentials\n- Activate their package\n- Send email with login details`)) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/activate-package`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify({
+          email: user.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to activate package:', data);
+        alert(data.error || 'Failed to activate package. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
+
+      console.log('Package activated successfully:', data);
+      alert(`Package activated for ${user.email}!\n\nTemporary password: ${data.temporaryPassword}\n\nEmail with credentials has been sent.`);
+
+      // Refresh the data
+      await fetchBookings();
+
+      setIsProcessing(false);
+    } catch (error) {
+      console.error('Error activating package:', error);
+      alert('Network error. Please check your connection.');
+      setIsProcessing(false);
     }
   };
 
@@ -1013,13 +1049,24 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                               )}
 
                               {user.status === 'pending' && user.packageType !== 'single' ? (
-                                <button
-                                  onClick={() => handleSendCode(user)}
-                                  className="px-3 py-1.5 bg-[#6b5949] text-white rounded-md text-xs font-medium hover:bg-[#5a4838] transition-colors flex items-center gap-1.5"
-                                >
-                                  <Mail className="w-3 h-3" />
-                                  Send Code
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleActivatePackage(user)}
+                                    disabled={isProcessing}
+                                    className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <CheckCircle className="w-3 h-3" />
+                                    AKTIVIZO
+                                  </button>
+                                  <button
+                                    onClick={() => handleSendCode(user)}
+                                    disabled={isSendingEmail}
+                                    className="px-3 py-1.5 bg-[#6b5949] text-white rounded-md text-xs font-medium hover:bg-[#5a4838] transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <Mail className="w-3 h-3" />
+                                    Resend Code
+                                  </button>
+                                </>
                               ) : user.status === 'confirmed' ? (
                                 <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-md text-xs font-medium flex items-center gap-1.5">
                                   <CheckCircle className="w-3 h-3" />

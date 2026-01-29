@@ -295,8 +295,12 @@ export const translations = {
     currentSession: 'Klasa aktuale',
     selectNewDateTime: 'Zgjidhni datën dhe orën e re',
     spotsLeft: 'vende',
+
+    // Inquiry popup (Individual/DUO)
+    inquiryReceived: 'Kërkesa u pranua!',
+    inquiryReceivedDesc: 'Faleminderit për interesin tuaj! Ekipi ynë do t\'ju kontaktojë brenda 24 orëve për të caktuar seancën tuaj.',
   },
-  
+
   MK: {
     // Days
     monday: 'ПОНЕДЕЛНИК',
@@ -591,8 +595,12 @@ export const translations = {
     currentSession: 'Тековна класа',
     selectNewDateTime: 'Изберете нов датум и време',
     spotsLeft: 'места',
+
+    // Inquiry popup (Individual/DUO)
+    inquiryReceived: 'Барањето е примено!',
+    inquiryReceivedDesc: 'Ви благодариме за интересот! Нашиот тим ќе ве контактира во рок од 24 часа за да закажеме ваша сесија.',
   },
-  
+
   EN: {
     // Days
     monday: 'MONDAY',
@@ -887,5 +895,9 @@ export const translations = {
     currentSession: 'Current Session',
     selectNewDateTime: 'Select New Date & Time',
     spotsLeft: 'spots',
+
+    // Inquiry popup (Individual/DUO)
+    inquiryReceived: 'Inquiry Received!',
+    inquiryReceivedDesc: 'Thank you for your interest! Our team will contact you within 24 hours to schedule your session.',
   },
 };

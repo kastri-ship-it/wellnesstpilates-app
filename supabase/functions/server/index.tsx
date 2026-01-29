@@ -2178,9 +2178,13 @@ app.get("/make-server-b87b0c07/bookings", async (c) => {
 app.post("/make-server-b87b0c07/bookings", async (c) => {
   try {
     const body = await c.req.json();
+    console.log('📥 Booking request body:', JSON.stringify(body));
     const { dateKey, timeSlot, instructor, name, surname, email, mobile, language, selectedPackage } = body;
 
+    console.log('📋 Extracted fields:', { dateKey, timeSlot, instructor, name, surname, email, mobile });
+
     if (!dateKey || !timeSlot || !instructor || !name || !surname || !email || !mobile) {
+      console.log('❌ Missing fields check failed:', { dateKey: !!dateKey, timeSlot: !!timeSlot, instructor: !!instructor, name: !!name, surname: !!surname, email: !!email, mobile: !!mobile });
       return c.json({ error: "Missing required fields" }, 400);
     }
 
@@ -3777,4 +3781,4 @@ if (hasResendKey) {
   console.log('   - Note: If domain not verified, verify at resend.com/domains');
 }
 
-Deno.serve(app.fetch);
+Deno.serve(app.fetch);// Force redeploy Thu Jan 29 01:41:00 UTC 2026
