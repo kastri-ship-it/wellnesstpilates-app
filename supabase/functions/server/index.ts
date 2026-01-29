@@ -394,7 +394,7 @@ async function sendActivationEmail(
     : `Thank you for choosing ${STUDIO_INFO.name}! Your ${packageName} package is ready to be activated.`;
   const activationCodeLabel = lang === 'SQ' ? 'KODI I AKTIVIZIMIT' : lang === 'MK' ? 'КОД ЗА АКТИВИРАЊЕ' : 'ACTIVATION CODE';
   const packageLabel = lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE';
-  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const priceLabel = lang === 'SQ' ? 'ÇMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
   const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
   const howToActivateTitle = lang === 'SQ' ? 'Si të aktivizoni' : lang === 'MK' ? 'Како да активирате' : 'How to activate';
   const step1 = lang === 'SQ' ? `Hapni aplikacionin e ${STUDIO_INFO.name}` : lang === 'MK' ? `Отворете ја апликацијата на ${STUDIO_INFO.name}` : `Open the ${STUDIO_INFO.name} booking app`;
@@ -518,7 +518,7 @@ async function sendRegistrationEmail(
   const classesLabel = lang === 'SQ' ? 'klase' : lang === 'MK' ? 'часови' : 'classes';
   const bonusFreeLabel = lang === 'SQ' ? 'KLASE FALAS' : lang === 'MK' ? 'БЕСПЛАТЕН ЧАС' : 'FREE CLASS';
   const totalLabel = lang === 'SQ' ? 'TOTALI' : lang === 'MK' ? 'ВКУПНО' : 'TOTAL';
-  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const priceLabel = lang === 'SQ' ? 'ÇMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
   const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
   const whatToBringTitle = lang === 'SQ' ? 'Çfarë të sillni' : lang === 'MK' ? 'Што да донесете' : 'What to bring';
   const whatToBringText = lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
@@ -642,7 +642,7 @@ async function sendSingleSessionEmail(email: string, name: string, dateKey: stri
     : 'Thank you for booking! Your reservation is confirmed.';
   const dateLabel = lang === 'SQ' ? 'DATA' : lang === 'MK' ? 'ДАТУМ' : 'DATE';
   const timeLabel = lang === 'SQ' ? 'ORA' : lang === 'MK' ? 'ВРЕМЕ' : 'TIME';
-  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const priceLabel = lang === 'SQ' ? 'ÇMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
   const whatToBringTitle = lang === 'SQ' ? 'Çfarë të sillni' : lang === 'MK' ? 'Што да донесете' : 'What to bring';
   const whatToBringText = lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
     : lang === 'MK' ? 'Ве молиме дојдете 10 минути порано. Донесете крпа и шише вода.'
@@ -739,7 +739,7 @@ async function sendPackageBookingEmail(email: string, name: string, packageType:
   const classesLabel = lang === 'SQ' ? 'klase' : lang === 'MK' ? 'часови' : 'classes';
   const bonusFreeLabel = lang === 'SQ' ? 'KLASE FALAS' : lang === 'MK' ? 'БЕСПЛАТЕН ЧАС' : 'FREE CLASS';
   const totalLabel = lang === 'SQ' ? 'TOTALI' : lang === 'MK' ? 'ВКУПНО' : 'TOTAL';
-  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const priceLabel = lang === 'SQ' ? 'ÇMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
   const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
   const whatToBringTitle = lang === 'SQ' ? 'Çfarë të sillni' : lang === 'MK' ? 'Што да донесете' : 'What to bring';
   const whatToBringText = lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
