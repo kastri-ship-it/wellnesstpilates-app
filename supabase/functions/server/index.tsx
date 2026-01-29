@@ -1100,51 +1100,6 @@ app.post("/make-server-b87b0c07/validate-coupon", async (c) => {
     const { code } = body;
 
     if (!code || typeof code !== 'string') {
-      return c.json({ valid: false, error: "Invalid coupon code format" });
-    }
-
-    const normalizedCode = code.trim().toUpperCase();
-    console.log(`🔍 Looking for coupon: ${normalizedCode}`);
-    
-    // Query redemption_codes table DIRECTLY (not kv_store!)
-    const supabase = getSupabase();
-    const { data: coupon, error } = await supabase
-      .from('redemption_codes')
-      .select('*')
-      .eq('code', normalizedCode)
-      .maybeSingle();
-
-    if (error) {
-      console.error('❌ Database error:', error);
-      return c.json({ valid: false, error: "Database error" }, 500);
-    }
-
-    if (!coupon) {
-      return c.json({ valid: false, error: "Coupon not found" });
-    }
-
-    console.log(`✅ Coupon found:`, coupon);
-    
-    return c.json({ 
-      valid: true, 
-      message: "Valid coupon! You'll receive +1 free class",
-      bonusClasses: 1
-    });
-
-  } catch (error) {
-    console.error('Error:', error);
-    return c.json({ valid: false, error: 'Server error' }, 500);
-  }
-});
-
-// ============ COUPON VALIDATION ENDPOINT ============
-
-app.post("/make-server-b87b0c07/validate-coupon", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { code } = body;
-
-    if (!code || typeof code !== 'string') {
       console.log('❌ Coupon validation failed: Invalid format');
       return c.json({ valid: false, error: "Invalid coupon code format" });
     }
@@ -2500,6 +2455,8 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
 
     console.log('📥 Parsed body:', JSON.stringify(body));
     const { dateKey, timeSlot, instructor, name, surname, email, mobile, language, selectedPackage } = body;
+    // NOTE: bonusClasses intentionally NOT accepted from client (fraud prevention)
+    // Legacy endpoint does not support coupons - use /packages endpoint for coupon support
 
     console.log('📋 Extracted fields:', { dateKey, timeSlot, instructor, name, surname, email, mobile });
 
@@ -2601,7 +2558,8 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
     try {
       if (selectedPackage) {
         // Package booking: send "awaiting payment" confirmation
-        await sendPackageBookingEmail(normalizedEmail, name, selectedPackage, dateKey, timeSlot, langCode);
+        // Legacy endpoint: no coupon support (fraud prevention) - bonusClasses always 0
+        await sendPackageBookingEmail(normalizedEmail, name, selectedPackage, dateKey, timeSlot, langCode, 0);
         console.log(`Package booking confirmation email sent to: ${normalizedEmail}`);
       } else {
         // Single session: send reservation confirmation
