@@ -366,17 +366,46 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
   const dates = generateAdminDates();
 
-  const timeSlots: TimeSlot[] = [
-    { time: '09:00 - 10:00', maxCapacity: 4 },
-    { time: '10:00 - 11:00', maxCapacity: 4 },
-    { time: '16:00 - 17:00', maxCapacity: 4 },
-    { time: '17:00 - 18:00', maxCapacity: 4 },
-    { time: '18:00 - 19:00', maxCapacity: 4 },
-    { time: '19:00 - 20:00', maxCapacity: 4 },
-    { time: '20:00 - 21:00', maxCapacity: 4 },
+  // Date-specific time slots configuration
+  const DATE_SPECIFIC_SLOTS: Record<string, TimeSlot[]> = {
+    '1-29': [
+      { time: '18:15', maxCapacity: 4 },
+      { time: '19:15', maxCapacity: 4 },
+      { time: '20:15', maxCapacity: 4 },
+    ],
+    '1-30': [
+      { time: '18:00', maxCapacity: 4 },
+      { time: '19:00', maxCapacity: 4 },
+      { time: '20:00', maxCapacity: 4 },
+    ],
+  };
+
+  const defaultTimeSlots: TimeSlot[] = [
+    { time: '09:00', maxCapacity: 4 },
+    { time: '10:00', maxCapacity: 4 },
+    { time: '16:00', maxCapacity: 4 },
+    { time: '17:00', maxCapacity: 4 },
+    { time: '18:00', maxCapacity: 4 },
+    { time: '19:00', maxCapacity: 4 },
+    { time: '20:00', maxCapacity: 4 },
   ];
 
-  const maxDailyCapacity = timeSlots.length * 4; // 7 slots × 4 capacity = 28 max bookings per day
+  // Get time slots for a specific date
+  const getTimeSlotsForDate = (dateKey: string): TimeSlot[] => {
+    return DATE_SPECIFIC_SLOTS[dateKey] || defaultTimeSlots;
+  };
+
+  // Get end time based on date (45 min for Jan 30, 50 min otherwise)
+  const getEndTime = (startTime: string, dateKey: string): string => {
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const duration = dateKey === '1-30' ? 45 : 50;
+    const totalMinutes = hours * 60 + minutes + duration;
+    const endHours = Math.floor(totalMinutes / 60);
+    const endMinutes = totalMinutes % 60;
+    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+  };
+
+  const maxDailyCapacity = 7 * 4; // Max 7 slots × 4 capacity = 28 max bookings per day
 
   const getBookingsForDate = (dateKey: string) => {
     return bookings.filter(booking => booking.dateKey === dateKey);
@@ -800,7 +829,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                   Time Slots for {dates.find(date => date.dateKey === selectedDate)?.displayDate}
                 </h2>
                 <div className="space-y-2">
-                  {timeSlots.map((timeSlot) => {
+                  {getTimeSlotsForDate(selectedDate).map((timeSlot) => {
                     const bookingsCount = getTimeSlotCapacity(selectedDate, timeSlot.time);
                     const isSelected = selectedTimeSlot === timeSlot.time;
                     const fillPercentage = (bookingsCount / timeSlot.maxCapacity) * 100;
@@ -861,7 +890,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                           <div className="relative z-10 h-full flex items-center justify-between px-4">
                             <div className="text-left">
                               <p className="text-base font-medium" style={{ color: textColor }}>
-                                {timeSlot.time}
+                                {timeSlot.time} - {getEndTime(timeSlot.time, selectedDate)}
                               </p>
                               <p className="text-xs text-[#8b7764] mt-1">
                                 {bookingsCount === 0 

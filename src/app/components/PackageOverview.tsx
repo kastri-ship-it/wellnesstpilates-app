@@ -267,36 +267,36 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       const now = new Date();
       const startDate = new Date(2026, 0, 29); // January 29, 2026 (month is 0-indexed)
 
-      const timeSlots = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
-      
+      // Date-specific time slots
+      const DATE_SPECIFIC_SLOTS: Record<string, string[]> = {
+        '1-29': ['18:15', '19:15', '20:15'],  // January 29
+        '1-30': ['18:00', '19:00', '20:00'],  // January 30
+      };
+      const defaultTimeSlots = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+
       let daysAdded = 0;
       let daysChecked = 0;
       const maxDaysToCheck = 10; // Check up to 10 days ahead to find 2 weekdays
-      
+
       while (daysAdded < 2 && daysChecked < maxDaysToCheck) {
         const date = new Date(startDate);
         date.setDate(startDate.getDate() + daysChecked);
         daysChecked++;
-        
+
         // Skip weekends (Saturday = 6, Sunday = 0)
         const dayOfWeek = date.getDay();
         if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
         const dateKey = `${date.getMonth() + 1}-${date.getDate()}`;
-        
+
         // Get all confirmed/attended bookings for this date (includes single bookings, package bookings, duo, individual)
-        const dayBookings = existingBookings.filter((b: any) => 
-          b.dateKey === dateKey && 
+        const dayBookings = existingBookings.filter((b: any) =>
+          b.dateKey === dateKey &&
           (b.reservationStatus === 'confirmed' || b.reservationStatus === 'attended' || b.reservationStatus === 'pending')
         );
-        
-        // Filter out 09:00 time slot for January 29th
-        const timeSlotsForThisDay = timeSlots.filter(time => {
-          if (dateKey === '1-29' && time === '09:00') {
-            return false; // Remove 09:00 on January 29th
-          }
-          return true;
-        });
+
+        // Get time slots for this specific date
+        const timeSlotsForThisDay = DATE_SPECIFIC_SLOTS[dateKey] || defaultTimeSlots;
         
         const availableTimeSlots = timeSlotsForThisDay.map(time => {
           // Calculate actual seats occupied for this time slot

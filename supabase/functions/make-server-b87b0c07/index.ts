@@ -32,7 +32,22 @@ app.use(
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 
                      'July', 'August', 'September', 'October', 'November', 'December'];
 
-const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '16:00', '17:00', '18:00'];
+// Default time slots
+const DEFAULT_TIME_SLOTS = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+
+// Date-specific time slots (dateKey format: "month-day", e.g., "1-29")
+const DATE_SPECIFIC_SLOTS: Record<string, string[]> = {
+  '1-29': ['18:15', '19:15', '20:15'],  // January 29
+  '1-30': ['18:00', '19:00', '20:00'],  // January 30
+};
+
+// Get time slots for a specific date
+function getTimeSlotsForDate(dateKey: string): string[] {
+  return DATE_SPECIFIC_SLOTS[dateKey] || DEFAULT_TIME_SLOTS;
+}
+
+// Legacy constant for backward compatibility
+const TIME_SLOTS = DEFAULT_TIME_SLOTS;
 
 const VALID_PACKAGE_TYPES = [
   'single', 'package8', 'package10', 'package12',
@@ -190,9 +205,16 @@ function extractSessionCount(packageType: PackageType): number {
   return match ? parseInt(match[1]) : 1;
 }
 
-function calculateEndTime(startTime: string): string {
+// Date-specific session durations (in minutes)
+const DATE_SPECIFIC_DURATIONS: Record<string, number> = {
+  '1-29': 50,  // January 29: 50 min sessions
+  '1-30': 45,  // January 30: 45 min sessions
+};
+
+function calculateEndTime(startTime: string, dateKey?: string): string {
   const [hours, minutes] = startTime.split(':').map(Number);
-  const totalMinutes = hours * 60 + minutes + 50;
+  const duration = dateKey && DATE_SPECIFIC_DURATIONS[dateKey] ? DATE_SPECIFIC_DURATIONS[dateKey] : 50;
+  const totalMinutes = hours * 60 + minutes + duration;
   const endHours = Math.floor(totalMinutes / 60);
   const endMinutes = totalMinutes % 60;
   return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
@@ -2808,18 +2830,21 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
 
     const allReservations = await kv.getByPrefix('reservation:');
     const dateReservations = allReservations.filter((r: any) => r.dateKey === dateKey);
-    
-    const calendarData = await Promise.all(TIME_SLOTS.map(async (timeSlot) => {
+
+    // Get time slots specific to this date
+    const timeSlotsForDate = getTimeSlotsForDate(dateKey);
+
+    const calendarData = await Promise.all(timeSlotsForDate.map(async (timeSlot) => {
       const slotReservations = dateReservations.filter((r: any) =>
         r.timeSlot === timeSlot &&
         (r.reservationStatus === 'pending' || r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
       );
-      
+
       const capacity = await calculateSlotCapacity(dateKey, timeSlot);
-      
+
       return {
         timeSlot,
-        endTime: calculateEndTime(timeSlot),
+        endTime: calculateEndTime(timeSlot, dateKey),
         capacity: capacity.available,
         maxCapacity: 4,
         isBlocked: capacity.isBlocked,
