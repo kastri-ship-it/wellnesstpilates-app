@@ -257,61 +257,67 @@ async function calculateSlotCapacity(dateKey: string, timeSlot: string): Promise
   };
 }
 
-// ============ EMAIL FUNCTIONS ============
+// ============ EMAIL TEMPLATE FRAMEWORK ============
 
-function getEmailHeader(): string {
-  return `
-    <tr>
-      <td style="background-color: #3E2B22; padding: 50px 40px; text-align: center;">
-        <img src="https://i.ibb.co/tT95h4s2/unnamed.png" alt="WellNest Pilates" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
-      </td>
-    </tr>
-  `;
-}
-
-function getEmailFooter(language: string = 'EN'): string {
-  const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
-  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
-  
-  return `
-    <tr>
-      <td style="background-color: #f5f0ed; padding: 30px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #6b5949; font-size: 14px;">${t.questionsContact}</p>
-        <p style="margin: 0; color: #9ca571; font-size: 14px;">
-          📍 ${STUDIO_INFO.address}<br>
-          📧 ${STUDIO_INFO.email}
-        </p>
-      </td>
-    </tr>
-  `;
-}
+const LOGO_URL = 'https://i.ibb.co/tT95h4s2/unnamed.png';
 
 function buildEmailTemplate(content: string, language: string = 'EN'): string {
+  const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
+
   return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f0ed;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; padding: 40px 20px;">
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f0ed;
+    }
+  </style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; padding: 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; max-width: 600px;">
+
+          <!-- HEADER with Logo -->
           <tr>
-            <td align="center">
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                ${getEmailHeader()}
-                <tr>
-                  <td style="padding: 40px;">
-                    ${content}
-                  </td>
-                </tr>
-                ${getEmailFooter(language)}
-              </table>
+            <td style="background-color: #452F21; padding: 30px; text-align: center;">
+              <img src="${LOGO_URL}" alt="WellNest Pilates" style="height: 90px;" />
             </td>
           </tr>
+
+          <!-- CONTENT -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              ${content}
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color: #f5f0ed; padding: 30px; text-align: center;">
+              <p style="margin: 0 0 5px 0; color: #8b7764; font-size: 12px; font-family: Georgia, 'Times New Roman', serif;">
+                ${STUDIO_INFO.address}
+              </p>
+              <p style="margin: 0; color: #8b7764; font-size: 12px; font-family: Georgia, 'Times New Roman', serif;">
+                © 2026 WellNest Pilates. ${lang === 'SQ' ? 'Të gjitha të drejtat e rezervuara.' : lang === 'MK' ? 'Сите права задржани.' : 'All rights reserved.'}
+              </p>
+            </td>
+          </tr>
+
         </table>
-      </body>
-    </html>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
   `;
 }
 
@@ -374,74 +380,112 @@ async function sendActivationEmail(
     timeSlot: string;
     endTime: string;
     instructor: string;
-  }
+  },
+  language: string = 'EN'
 ) {
+  const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
   const { price, label: packageName } = getPackagePriceInfo(packageType);
   const sessionCount = extractSessionCount(packageType);
 
-  const firstSessionHtml = firstSessionDetails ? `
-    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 Your First Class</h3>
-      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
-        <strong>Date:</strong> ${firstSessionDetails.date}<br>
-        <strong>Time:</strong> ${firstSessionDetails.timeSlot} - ${firstSessionDetails.endTime}<br>
-        <strong>Instructor:</strong> ${firstSessionDetails.instructor}
-      </p>
-    </div>
-    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 15px; line-height: 1.6;">
-      <strong>Remaining classes:</strong> ${sessionCount - 1} more class${sessionCount - 1 !== 1 ? 'es' : ''} to book through your dashboard.
-    </p>
-  ` : '';
+  const title = lang === 'SQ' ? 'Aktivizo Paketën' : lang === 'MK' ? 'Активирајте Пакет' : 'Activate Your Package';
+  const message = lang === 'SQ' ? `Faleminderit që zgjodhët ${STUDIO_INFO.name}! Paketa juaj ${packageName} është gati për aktivizim.`
+    : lang === 'MK' ? `Ви благодариме што го избравте ${STUDIO_INFO.name}! Вашиот пакет ${packageName} е подготвен за активирање.`
+    : `Thank you for choosing ${STUDIO_INFO.name}! Your ${packageName} package is ready to be activated.`;
+  const activationCodeLabel = lang === 'SQ' ? 'KODI I AKTIVIZIMIT' : lang === 'MK' ? 'КОД ЗА АКТИВИРАЊЕ' : 'ACTIVATION CODE';
+  const packageLabel = lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE';
+  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
+  const howToActivateTitle = lang === 'SQ' ? 'Si të aktivizoni' : lang === 'MK' ? 'Како да активирате' : 'How to activate';
+  const step1 = lang === 'SQ' ? `Hapni aplikacionin e ${STUDIO_INFO.name}` : lang === 'MK' ? `Отворете ја апликацијата на ${STUDIO_INFO.name}` : `Open the ${STUDIO_INFO.name} booking app`;
+  const step2 = lang === 'SQ' ? 'Klikoni "Hyrja e Anëtarëve"' : lang === 'MK' ? 'Кликнете "Најава на Членови"' : 'Click "Member Login"';
+  const step3 = lang === 'SQ' ? 'Vendosni emailin dhe kodin e aktivizimit' : lang === 'MK' ? 'Внесете го емаилот и кодот за активирање' : 'Enter your email and activation code';
+  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
+
+  // First session details rows if available
+  const firstSessionRows = firstSessionDetails ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${firstClassLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${firstSessionDetails.date}, ${firstSessionDetails.timeSlot}</span>
+              </td>
+            </tr>` : '';
 
   const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">Welcome, ${name}${surname ? ' ' + surname : ''}! 🎉</h2>
-    
-    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-      Thank you for choosing ${STUDIO_INFO.name}! Your ${packageName} ${firstSessionDetails ? 'package is ready to be activated' : 'booking is confirmed'}.
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      ${title}
+    </h1>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${t.greeting}, ${name}${surname ? ' ' + surname : ''}
     </p>
-    
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 30px 0;">
-      <p style="margin: 0 0 12px 0; color: #6b5949; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Activation Code</p>
-      <p style="margin: 0; color: #3d2f28; font-size: 32px; font-weight: bold; letter-spacing: 2px; font-family: 'Courier New', monospace;">
-        ${activationCode}
-      </p>
-    </div>
-    
-    <div style="background-color: #fff8f0; border-left: 4px solid #9ca571; padding: 16px; margin: 24px 0;">
-      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-        <strong style="color: #3d2f28;">Package Details:</strong><br>
-        ${packageName} - ${price} DEN
-      </p>
-    </div>
-    
-    ${firstSessionHtml}
-    
-    <h3 style="margin: 30px 0 16px 0; color: #3d2f28; font-size: 18px;">How to Activate:</h3>
-    <ol style="margin: 0; padding-left: 20px; color: #6b5949; font-size: 15px; line-height: 1.8;">
-      <li>Open the ${STUDIO_INFO.name} booking app</li>
-      <li>Click on "Member Login" or "Activate Member Area"</li>
-      <li>Enter your email and the activation code above</li>
-      <li>Start ${firstSessionDetails ? 'booking your remaining sessions' : 'enjoying your Pilates journey'}!</li>
-    </ol>
-    
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 30px 0;">
-      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 14px; font-weight: 600;">Important:</p>
-      <ul style="margin: 0; padding-left: 20px; color: #6b5949; font-size: 14px; line-height: 1.6;">
-        <li>Payment is due in the studio before your class</li>
-        <li>Please arrive 10 minutes early for your first class</li>
-        <li>Cancellations must be made at least 24 hours in advance</li>
-        <li>This activation code expires in 24 hours</li>
-      </ul>
-    </div>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${message}
+    </p>
+
+    <!-- ACTIVATION CODE BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #452F21; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 25px; text-align: center;">
+          <p style="margin: 0 0 5px 0; color: #ffffff; font-size: 12px; opacity: 0.8; font-family: Georgia, 'Times New Roman', serif;">${activationCodeLabel}</p>
+          <p style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; font-family: Georgia, 'Times New Roman', serif;">${activationCode}</p>
+        </td>
+      </tr>
+    </table>
+
+    <!-- DETAILS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${packageLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${packageName}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${priceLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${price} DEN</span>
+              </td>
+            </tr>
+            ${firstSessionRows}
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- NOTE BOX - How to Activate -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${howToActivateTitle}</p>
+          <p style="margin: 5px 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">1. ${step1}</p>
+          <p style="margin: 5px 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">2. ${step2}</p>
+          <p style="margin: 5px 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">3. ${step3}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
+      ${regards}<br>
+      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
+    </p>
   `;
 
-  return sendEmail(
-    email,
-    firstSessionDetails 
-      ? `Activate Your ${packageName} Package - ${STUDIO_INFO.name}`
-      : `Confirm Your Booking - ${STUDIO_INFO.name}`,
-    content
-  );
+  const subject = lang === 'SQ' ? `Aktivizo Paketën - ${STUDIO_INFO.name}`
+    : lang === 'MK' ? `Активирајте Пакет - ${STUDIO_INFO.name}`
+    : `Activate Your Package - ${STUDIO_INFO.name}`;
+
+  return sendEmail(email, subject, content, language);
 }
 
 async function sendRegistrationEmail(
@@ -461,48 +505,106 @@ async function sendRegistrationEmail(
   // Normalize language to uppercase and default to EN if invalid
   const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
   const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
-  
-  const { label: packageName } = getPackagePriceInfo(packageType);
-  const currentDate = new Date().toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
 
-  const bonusHtml = bonusClasses > 0 ? `<div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 24px 0; border: 2px solid #86efac;"><h3 style="margin: 0 0 12px 0; color: #16a34a; font-size: 18px;">🎁 Bonus Redeemed!</h3><p style="margin: 0; color: #15803d; font-size: 15px; font-weight: bold;">+${bonusClasses} Free Class Added!</p><p style="margin: 8px 0 0 0; color: #166534; font-size: 14px;">Your coupon has been successfully redeemed.</p></div>` : '';
+  const { label: packageName, price } = getPackagePriceInfo(packageType);
+  const sessionCount = extractSessionCount(packageType);
+  const totalClasses = sessionCount + bonusClasses;
+
+  const title = lang === 'SQ' ? 'Konfirmim Rezervimi' : lang === 'MK' ? 'Потврда за резервација' : 'Booking Confirmation';
+  const message = lang === 'SQ' ? 'Faleminderit që u regjistruat në listën tonë. Rezervimi juaj është konfirmuar.'
+    : lang === 'MK' ? 'Ви благодариме што се регистриравте на нашата листа. Вашата резервација е потврдена.'
+    : 'Thank you for registering. Your booking is confirmed.';
+  const packageLabel = lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE';
+  const classesLabel = lang === 'SQ' ? 'klase' : lang === 'MK' ? 'часови' : 'classes';
+  const bonusFreeLabel = lang === 'SQ' ? 'KLASE FALAS' : lang === 'MK' ? 'БЕСПЛАТЕН ЧАС' : 'FREE CLASS';
+  const totalLabel = lang === 'SQ' ? 'TOTALI' : lang === 'MK' ? 'ВКУПНО' : 'TOTAL';
+  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
+  const whatToBringTitle = lang === 'SQ' ? 'Çfarë të sillni' : lang === 'MK' ? 'Што да донесете' : 'What to bring';
+  const whatToBringText = lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
+    : lang === 'MK' ? 'Ве молиме дојдете 10 минути порано. Донесете крпа и шише вода.'
+    : 'Please arrive 10 minutes early. Bring a towel and water bottle.';
+  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
+
+  // Bonus section (only if coupon was used)
+  const bonusRows = bonusClasses > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #4CAF50; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">+${bonusClasses} ${bonusFreeLabel}!</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${totalLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${totalClasses} ${classesLabel}</span>
+              </td>
+            </tr>` : '';
 
   const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.bookingConfirmation}</h2>
-    
-    <p style="margin: 0 0 10px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-      ${t.thankYou}
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      ${title}
+    </h1>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${t.greeting}, ${name}${surname ? ' ' + surname : ''}
     </p>
-    
-    <p style="margin: 0 0 20px 0; color: #8b7764; font-size: 14px;">
-      <strong>${t.bookingDate}:</strong> ${currentDate}
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${message}
     </p>
-    
-    ${bonusHtml}
-    
-    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${t.yourSession}</h3>
-      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
-        <strong>${t.date}:</strong> ${firstSessionDate}<br>
-        <strong>${t.time}:</strong> ${firstSessionTime} - ${firstSessionEndTime}
-      </p>
-    </div>
-    
-    <div style="background-color: #fff8f0; border-left: 4px solid #9ca571; padding: 20px; margin: 24px 0;">
-      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.6;">
-        <strong style="color: #3d2f28;">${t.important}:</strong><br>
-        ${t.paymentMessage}
-      </p>
-    </div>
-    
-    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-      ${t.lookForward}
+
+    <!-- DETAILS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${packageLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${sessionCount} ${classesLabel}</span>
+              </td>
+            </tr>
+            ${bonusRows}
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${priceLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${price} DEN</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${firstClassLabel}</span>
+              </td>
+              <td style="padding: 8px 0; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${firstSessionDate}, ${firstSessionTime}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- NOTE BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${whatToBringTitle}</p>
+          <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">${whatToBringText}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
+      ${regards}<br>
+      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
     </p>
   `;
 
@@ -534,34 +636,79 @@ async function sendSingleSessionEmail(email: string, name: string, dateKey: stri
   const formattedDate = formatDateForEmail(dateKey, language);
   const endTime = calculateEndTime(timeSlot);
 
-  const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.greeting}, ${name}!</h2>
+  const title = lang === 'SQ' ? 'Konfirmim Rezervimi' : lang === 'MK' ? 'Потврда за резервација' : 'Booking Confirmation';
+  const message = lang === 'SQ' ? 'Faleminderit që rezervuat! Rezervimi juaj është konfirmuar.'
+    : lang === 'MK' ? 'Ви благодариме за резервацијата! Вашата резервација е потврдена.'
+    : 'Thank you for booking! Your reservation is confirmed.';
+  const dateLabel = lang === 'SQ' ? 'DATA' : lang === 'MK' ? 'ДАТУМ' : 'DATE';
+  const timeLabel = lang === 'SQ' ? 'ORA' : lang === 'MK' ? 'ВРЕМЕ' : 'TIME';
+  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const whatToBringTitle = lang === 'SQ' ? 'Çfarë të sillni' : lang === 'MK' ? 'Што да донесете' : 'What to bring';
+  const whatToBringText = lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
+    : lang === 'MK' ? 'Ве молиме дојдете 10 минути порано. Донесете крпа и шише вода.'
+    : 'Please arrive 10 minutes early. Bring a towel and water bottle.';
+  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
 
-    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-      ${lang === 'SQ' ? 'Faleminderit që rezervuat! Rezervimi juaj është konfirmuar.'
-        : lang === 'MK' ? 'Ви благодариме за резервацијата! Вашата резервација е потврдена.'
-        : 'Thank you for booking! Your reservation is confirmed.'}
+  const content = `
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      ${title}
+    </h1>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${t.greeting}, ${name}
     </p>
 
-    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${t.yourSession}</h3>
-      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
-        <strong>${t.date}:</strong> ${formattedDate}<br>
-        <strong>${t.time}:</strong> ${timeSlot} - ${endTime}
-      </p>
-    </div>
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${message}
+    </p>
 
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 24px 0;">
-      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-        <strong>${t.important}:</strong><br>
-        ${lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
-          : lang === 'MK' ? 'Ве молиме дојдете 10 минути порано. Донесете крпа и шише вода.'
-          : 'Please arrive 10 minutes early. Bring a towel and water bottle.'}
-      </p>
-    </div>
+    <!-- DETAILS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${dateLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${formattedDate}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${timeLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${timeSlot} - ${endTime}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${priceLabel}</span>
+              </td>
+              <td style="padding: 8px 0; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">350 DEN</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-      ${t.lookForward}
+    <!-- NOTE BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${whatToBringTitle}</p>
+          <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">${whatToBringText}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
+      ${regards}<br>
+      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
     </p>
   `;
 
@@ -572,7 +719,7 @@ async function sendSingleSessionEmail(email: string, name: string, dateKey: stri
   return sendEmail(email, subject, content, language);
 }
 
-async function sendPackageBookingEmail(email: string, name: string, packageType: string, dateKey: string, timeSlot: string, language: string = 'EN') {
+async function sendPackageBookingEmail(email: string, name: string, packageType: string, dateKey: string, timeSlot: string, language: string = 'EN', bonusClasses: number = 0) {
   const lang = language.toUpperCase() as keyof typeof EMAIL_TRANSLATIONS;
   const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
   const formattedDate = formatDateForEmail(dateKey, language);
@@ -581,59 +728,104 @@ async function sendPackageBookingEmail(email: string, name: string, packageType:
   // Get package details
   const packageSessions = packageType.includes('8') ? '8' : packageType.includes('10') ? '10' : '12';
   const packagePrice = packageType.includes('8') ? '3500' : packageType.includes('10') ? '4200' : '4800';
+  const totalClasses = parseInt(packageSessions) + bonusClasses;
+
+  // Labels
+  const title = lang === 'SQ' ? 'Konfirmim Rezervimi' : lang === 'MK' ? 'Потврда за резервација' : 'Booking Confirmation';
+  const message = lang === 'SQ' ? 'Faleminderit që u regjistruat në listën tonë. Rezervimi juaj është konfirmuar.'
+    : lang === 'MK' ? 'Ви благодариме што се регистриравте на нашата листа. Вашата резервација е потврдена.'
+    : 'Thank you for registering. Your booking is confirmed.';
+  const packageLabel = lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE';
+  const classesLabel = lang === 'SQ' ? 'klase' : lang === 'MK' ? 'часови' : 'classes';
+  const bonusFreeLabel = lang === 'SQ' ? 'KLASE FALAS' : lang === 'MK' ? 'БЕСПЛАТЕН ЧАС' : 'FREE CLASS';
+  const totalLabel = lang === 'SQ' ? 'TOTALI' : lang === 'MK' ? 'ВКУПНО' : 'TOTAL';
+  const priceLabel = lang === 'SQ' ? 'CMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
+  const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
+  const whatToBringTitle = lang === 'SQ' ? 'Çfarë të sillni' : lang === 'MK' ? 'Што да донесете' : 'What to bring';
+  const whatToBringText = lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
+    : lang === 'MK' ? 'Ве молиме дојдете 10 минути порано. Донесете крпа и шише вода.'
+    : 'Please arrive 10 minutes early. Bring a towel and water bottle.';
+  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
+
+  // Bonus section (only if coupon was used)
+  const bonusRows = bonusClasses > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #4CAF50; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">+${bonusClasses} ${bonusFreeLabel}!</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${totalLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${totalClasses} ${classesLabel}</span>
+              </td>
+            </tr>` : '';
 
   const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.greeting}, ${name}!</h2>
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      ${title}
+    </h1>
 
-    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-      ${lang === 'SQ' ? 'Faleminderit që zgjodhët paketën tonë! Rezervimi juaj u regjistrua me sukses.'
-        : lang === 'MK' ? 'Ви благодариме што го избравте нашиот пакет! Вашата резервација е успешно регистрирана.'
-        : 'Thank you for choosing our package! Your booking has been successfully registered.'}
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${t.greeting}, ${name}
     </p>
 
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <p style="margin: 0 0 8px 0; color: #8b7764; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;">
-        ${lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE'}
-      </p>
-      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 20px; font-weight: 600;">
-        ${packageSessions} ${lang === 'SQ' ? 'klase' : lang === 'MK' ? 'часови' : 'classes'}
-      </p>
-      <p style="margin: 0; color: #4CAF50; font-size: 13px; font-weight: 600;">
-        +1 ${lang === 'SQ' ? 'KLASE FALAS' : lang === 'MK' ? 'БЕСПЛАТЕН ЧАС' : 'FREE CLASS'}!
-      </p>
-      <div style="border-top: 1px solid #e5e5e5; margin-top: 16px; padding-top: 16px;">
-        <p style="margin: 0; color: #3d2f28; font-size: 18px;">
-          ${lang === 'SQ' ? 'Totali' : lang === 'MK' ? 'Вкупно' : 'Total'}: ${packagePrice} DEN
-        </p>
-      </div>
-    </div>
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${message}
+    </p>
 
-    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${lang === 'SQ' ? 'Klasa e Parë' : lang === 'MK' ? 'Прв Час' : 'First Class'}</h3>
-      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
-        <strong>${t.date}:</strong> ${formattedDate}<br>
-        <strong>${t.time}:</strong> ${timeSlot} - ${endTime}
-      </p>
-    </div>
+    <!-- DETAILS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${packageLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${packageSessions} ${classesLabel}</span>
+              </td>
+            </tr>
+            ${bonusRows}
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${priceLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${packagePrice} DEN</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${firstClassLabel}</span>
+              </td>
+              <td style="padding: 8px 0; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${formattedDate}, ${timeSlot}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-    <div style="background-color: #fff8f0; border-left: 4px solid #ff9800; padding: 20px; margin: 24px 0;">
-      <h3 style="margin: 0 0 12px 0; color: #e65100; font-size: 16px;">⏳ ${lang === 'SQ' ? 'Hapi i Radhës' : lang === 'MK' ? 'Следен Чекор' : 'Next Step'}</h3>
-      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.6;">
-        ${lang === 'SQ' ? 'Ju lutem vizitoni studion tonë për të paguar dhe aktivizuar paketën tuaj. Pasi të paguani, do të merrni kredencialet për të hyrë në llogarinë tuaj.'
-          : lang === 'MK' ? 'Ве молиме посетете го нашето студио за да платите и да го активирате вашиот пакет. Откако ќе платите, ќе ги добиете вашите податоци за најава.'
-          : 'Please visit our studio to pay and activate your package. Once paid, you will receive your login credentials.'}
-      </p>
-    </div>
+    <!-- NOTE BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${whatToBringTitle}</p>
+          <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">${whatToBringText}</p>
+        </td>
+      </tr>
+    </table>
 
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 24px 0;">
-      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 14px; font-weight: 600;">${lang === 'SQ' ? 'Vendndodhja' : lang === 'MK' ? 'Локација' : 'Location'}:</p>
-      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-        ${STUDIO_INFO.address}
-      </p>
-    </div>
-
-    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-      ${t.lookForward}
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
+      ${regards}<br>
+      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
     </p>
   `;
 
@@ -649,39 +841,76 @@ async function sendInquiryEmail(email: string, name: string, surname: string, mo
   const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
 
   const serviceLabel = serviceType === 'individual'
-    ? (lang === 'SQ' ? 'Trajnim Individual' : lang === 'MK' ? 'Индивидуална Тренинг' : 'Individual Training')
+    ? (lang === 'SQ' ? 'Trajnim Individual' : lang === 'MK' ? 'Индивидуален Тренинг' : 'Individual Training')
     : (lang === 'SQ' ? 'Trajnim DUO' : lang === 'MK' ? 'ДУО Тренинг' : 'DUO Training');
 
   const sessions = packageType.includes('1') ? '1' : packageType.includes('8') ? '8' : '12';
+  const sessionsLabel = lang === 'SQ' ? 'seanca' : lang === 'MK' ? 'сесии' : 'sessions';
+
+  const title = lang === 'SQ' ? 'Kërkesa u Pranua' : lang === 'MK' ? 'Барањето е Примено' : 'Inquiry Received';
+  const message = lang === 'SQ' ? `Faleminderit për interesin tuaj! Kemi marrë kërkesën tuaj për ${serviceLabel}.`
+    : lang === 'MK' ? `Ви благодариме за интересот! Ја примивме вашата барање за ${serviceLabel}.`
+    : `Thank you for your interest! We have received your inquiry for ${serviceLabel}.`;
+  const serviceNameLabel = lang === 'SQ' ? 'SHËRBIMI' : lang === 'MK' ? 'УСЛУГА' : 'SERVICE';
+  const packageLabel = lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE';
+  const nextStepsTitle = lang === 'SQ' ? 'Çfarë pritet tani?' : lang === 'MK' ? 'Што следи?' : 'What happens next?';
+  const nextStepsText = lang === 'SQ' ? 'Ekipi ynë do t\'ju kontaktojë brenda 24 orëve për të diskutuar disponueshmërinë dhe për të caktuar seancën tuaj.'
+    : lang === 'MK' ? 'Нашиот тим ќе ве контактира во рок од 24 часа за да разговарате за достапноста и да закажете ваша сесија.'
+    : 'Our team will contact you within 24 hours to discuss availability and schedule your session.';
+  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
 
   const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.greeting}, ${name}!</h2>
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      ${title}
+    </h1>
 
-    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-      ${lang === 'SQ' ? 'Faleminderit për interesin tuaj! Kemi marrë kërkesën tuaj për'
-        : lang === 'MK' ? 'Ви благодариме за интересот! Ја примивме вашата барање за'
-        : 'Thank you for your interest! We have received your inquiry for'} ${serviceLabel}.
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${t.greeting}, ${name}
     </p>
 
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #3d2f28; font-size: 18px;">📋 ${lang === 'SQ' ? 'Detajet e Kërkesës' : lang === 'MK' ? 'Детали за Барањето' : 'Inquiry Details'}</h3>
-      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.8;">
-        <strong>${lang === 'SQ' ? 'Shërbimi' : lang === 'MK' ? 'Услуга' : 'Service'}:</strong> ${serviceLabel}<br>
-        <strong>${lang === 'SQ' ? 'Paketa' : lang === 'MK' ? 'Пакет' : 'Package'}:</strong> ${sessions} ${lang === 'SQ' ? 'seanca' : lang === 'MK' ? 'сесии' : 'sessions'}
-      </p>
-    </div>
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${message}
+    </p>
 
-    <div style="background-color: #e3f2fd; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 12px 0; color: #1565c0; font-size: 16px;">📞 ${lang === 'SQ' ? 'Çfarë Pritet Tani?' : lang === 'MK' ? 'Што Следи?' : 'What Happens Next?'}</h3>
-      <p style="margin: 0; color: #1976d2; font-size: 15px; line-height: 1.6;">
-        ${lang === 'SQ' ? 'Ekipi ynë do t\'ju kontaktojë brenda 24 orëve për të diskutuar disponueshmërinë dhe për të caktuar seancën tuaj.'
-          : lang === 'MK' ? 'Нашиот тим ќе ве контактира во рок од 24 часа за да разговарате за достапноста и да закажете ваша сесија.'
-          : 'Our team will contact you within 24 hours to discuss availability and schedule your session.'}
-      </p>
-    </div>
+    <!-- DETAILS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${serviceNameLabel}</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${serviceLabel}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${packageLabel}</span>
+              </td>
+              <td style="padding: 8px 0; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${sessions} ${sessionsLabel}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-      ${t.questionsContact} ${STUDIO_INFO.email}
+    <!-- NOTE BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${nextStepsTitle}</p>
+          <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">${nextStepsText}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
+      ${regards}<br>
+      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
     </p>
   `;
 
@@ -697,24 +926,85 @@ async function sendStudioInquiryNotification(customerEmail: string, customerName
   const serviceLabel = serviceType === 'individual' ? 'Individual Training' : 'DUO Training';
 
   const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">📩 New ${serviceLabel} Inquiry</h2>
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      New ${serviceLabel} Inquiry
+    </h1>
 
-    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #3d2f28; font-size: 18px;">Customer Details</h3>
-      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.8;">
-        <strong>Name:</strong> ${customerName} ${customerSurname}<br>
-        <strong>Email:</strong> ${customerEmail}<br>
-        <strong>Mobile:</strong> ${customerMobile}<br>
-        <strong>Service:</strong> ${serviceLabel}<br>
-        <strong>Package:</strong> ${sessions} sessions
-      </p>
-    </div>
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      A new inquiry has been received. Please contact the customer within 24 hours.
+    </p>
 
-    <div style="background-color: #fff8f0; border-left: 4px solid #ff9800; padding: 20px; margin: 24px 0;">
-      <p style="margin: 0; color: #6b5949; font-size: 14px;">
-        <strong>Action Required:</strong> Please contact the customer within 24 hours to schedule their session.
-      </p>
-    </div>
+    <!-- CUSTOMER INFO BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 15px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">Customer Information</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">NAME</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${customerName} ${customerSurname}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">EMAIL</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${customerEmail}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">PHONE</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${customerMobile}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- REQUEST DETAILS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 15px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">Request Details</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">SERVICE</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${serviceLabel}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;">
+                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">PACKAGE</span>
+              </td>
+              <td style="padding: 8px 0; text-align: right;">
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${sessions} sessions</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- ACTION NOTE -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">Action Required</p>
+          <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">Please contact the customer within 24 hours to schedule their session.</p>
+        </td>
+      </tr>
+    </table>
   `;
 
   return sendEmail(STUDIO_INFO.email, `New ${serviceLabel} Inquiry - ${customerName} ${customerSurname}`, content, 'EN');
@@ -724,41 +1014,68 @@ async function sendActivationCredentialsEmail(email: string, name: string, tempo
   const lang = language.toUpperCase() as keyof typeof EMAIL_TRANSLATIONS;
   const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
 
-  const content = `
-    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">🎉 ${lang === 'SQ' ? 'Llogaria Juaj është Gati!' : lang === 'MK' ? 'Вашата Сметка е Подготвена!' : 'Your Account is Ready!'}</h2>
+  const title = lang === 'SQ' ? 'Llogaria Juaj është Gati!' : lang === 'MK' ? 'Вашата Сметка е Подготвена!' : 'Your Account is Ready!';
+  const message = lang === 'SQ' ? 'Faleminderit për pagesën! Paketa juaj është aktivizuar dhe tani mund të hyni në llogarinë tuaj.'
+    : lang === 'MK' ? 'Ви благодариме за уплатата! Вашиот пакет е активиран и сега можете да се најавите на вашата сметка.'
+    : 'Thank you for your payment! Your package has been activated and you can now log in to your account.';
+  const emailLabel = 'EMAIL';
+  const passwordLabel = lang === 'SQ' ? 'FJALËKALIMI' : lang === 'MK' ? 'ЛОЗИНКА' : 'PASSWORD';
+  const noteTitle = lang === 'SQ' ? 'I rëndësishëm' : lang === 'MK' ? 'Важно' : 'Important';
+  const noteText = lang === 'SQ' ? 'Ju rekomandojmë të ndryshoni fjalëkalimin tuaj pas hyrjes së parë.'
+    : lang === 'MK' ? 'Ви препорачуваме да ја промените лозинката по првото најавување.'
+    : 'We recommend changing your password after your first login.';
+  const loginButton = lang === 'SQ' ? 'Hyni Tani' : lang === 'MK' ? 'Најави се Сега' : 'Login Now';
+  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
 
-    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
-      ${lang === 'SQ' ? 'Faleminderit për pagesën! Paketa juaj është aktivizuar dhe tani mund të hyni në llogarinë tuaj.'
-        : lang === 'MK' ? 'Ви благодариме за уплатата! Вашиот пакет е активиран и сега можете да се најавите на вашата сметка.'
-        : 'Thank you for your payment! Your package has been activated and you can now log in to your account.'}
+  const content = `
+    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
+      ${title}
+    </h1>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${t.greeting}, ${name}
     </p>
 
-    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">🔐 ${lang === 'SQ' ? 'Kredencialet e Hyrjes' : lang === 'MK' ? 'Податоци за Најава' : 'Login Credentials'}</h3>
-      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.8;">
-        <strong>Email:</strong> ${email}<br>
-        <strong>${lang === 'SQ' ? 'Fjalëkalimi i Përkohshëm' : lang === 'MK' ? 'Привремена Лозинка' : 'Temporary Password'}:</strong>
-        <span style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #2e7d32;">${temporaryPassword}</span>
-      </p>
-    </div>
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
+      ${message}
+    </p>
 
-    <div style="background-color: #fff8f0; border-left: 4px solid #ff9800; padding: 20px; margin: 24px 0;">
-      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-        <strong>${t.important}:</strong><br>
-        ${lang === 'SQ' ? 'Ju rekomandojmë të ndryshoni fjalëkalimin tuaj pas hyrjes së parë.'
-          : lang === 'MK' ? 'Ви препорачуваме да ја промените лозинката по првото најавување.'
-          : 'We recommend changing your password after your first login.'}
-      </p>
-    </div>
+    <!-- CREDENTIALS BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #452F21; border-radius: 8px; margin: 25px 0;">
+      <tr>
+        <td style="padding: 25px; text-align: center;">
+          <p style="margin: 0 0 5px 0; color: #ffffff; font-size: 12px; opacity: 0.8; font-family: Georgia, 'Times New Roman', serif;">${emailLabel}</p>
+          <p style="margin: 0 0 20px 0; color: #ffffff; font-size: 18px; font-weight: bold; letter-spacing: 1px; font-family: Georgia, 'Times New Roman', serif;">${email}</p>
+          <p style="margin: 0 0 5px 0; color: #ffffff; font-size: 12px; opacity: 0.8; font-family: Georgia, 'Times New Roman', serif;">${passwordLabel}</p>
+          <p style="margin: 0; color: #ffffff; font-size: 18px; font-weight: bold; letter-spacing: 1px; font-family: Georgia, 'Times New Roman', serif;">${temporaryPassword}</p>
+        </td>
+      </tr>
+    </table>
 
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="https://wellnestpilates.com/#/login" style="display: inline-block; background-color: #9ca571; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-        ${lang === 'SQ' ? 'Hyni Tani' : lang === 'MK' ? 'Најави се Сега' : 'Login Now'}
-      </a>
-    </div>
+    <!-- LOGIN BUTTON -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin: 25px 0;">
+      <tr>
+        <td style="text-align: center;">
+          <a href="https://wellnestpilates.com/#/login" style="display: inline-block; background-color: #9ca571; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-family: Georgia, 'Times New Roman', serif;">
+            ${loginButton}
+          </a>
+        </td>
+      </tr>
+    </table>
 
-    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
-      ${t.lookForward}
+    <!-- NOTE BOX -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${noteTitle}</p>
+          <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">${noteText}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
+      ${regards}<br>
+      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
     </p>
   `;
 
