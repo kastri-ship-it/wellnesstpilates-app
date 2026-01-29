@@ -4077,6 +4077,340 @@ app.post('/make-server-b87b0c07/upload-logo', async (c) => {
   }
 });
 
+// ============ ADMIN DASHBOARD ENDPOINT ============
+
+app.get("/make-server-b87b0c07/admin/dashboard", async (c) => {
+  try {
+    const today = new Date();
+    const todayDateKey = `${today.getMonth() + 1}-${today.getDate()}`;
+
+    // Get all reservations
+    const allReservations = await kv.getByPrefix('reservation:');
+
+    // Filter for today's reservations
+    const todayReservations = allReservations.filter((r: any) => r.dateKey === todayDateKey);
+
+    // Calculate metrics
+    const totalBookings = todayReservations.length;
+    const paidCount = todayReservations.filter((r: any) =>
+      r.paymentStatus === 'paid' || r.reservationStatus === 'confirmed'
+    ).length;
+    const attendedCount = todayReservations.filter((r: any) =>
+      r.reservationStatus === 'attended' || r.reservationStatus === 'confirmed'
+    ).length;
+    const pendingCount = totalBookings - paidCount;
+
+    // Estimate revenue (simplified)
+    const estimatedRevenue = paidCount * 500; // Base per-session price
+
+    // Get all users for total count
+    const allUsers = await kv.getByPrefix('user:');
+
+    // Get all packages
+    const allPackages = await kv.getByPrefix('package:');
+    const activePackages = allPackages.filter((p: any) =>
+      p.packageStatus === 'active' || p.packageStatus === 'pending'
+    );
+
+    return c.json({
+      success: true,
+      dashboard: {
+        todayDateKey,
+        metrics: {
+          totalBookings,
+          paidCount,
+          pendingCount,
+          attendedCount,
+          attendanceRate: totalBookings > 0 ? Math.round((attendedCount / totalBookings) * 100) : 0,
+          estimatedRevenue,
+        },
+        totals: {
+          totalUsers: allUsers.length,
+          activePackages: activePackages.length,
+        },
+        todayReservations: todayReservations.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          surname: r.surname,
+          timeSlot: r.timeSlot,
+          reservationStatus: r.reservationStatus,
+          paymentStatus: r.paymentStatus,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard:', error);
+    return c.json({ error: 'Failed to fetch dashboard', details: error.message }, 500);
+  }
+});
+
+// ============ SCHEDULE MANAGEMENT ENDPOINTS ============
+
+app.get("/make-server-b87b0c07/admin/schedule", async (c) => {
+  try {
+    // Get schedule config from KV store
+    let config = await kv.get('schedule:config');
+
+    // If no config exists, return defaults
+    if (!config) {
+      config = {
+        workingDays: [1, 2, 3, 4, 5], // Mon-Fri
+        defaultSlots: DEFAULT_TIME_SLOTS,
+        defaultDuration: 50,
+        blockedDates: [],
+        customSlots: DATE_SPECIFIC_SLOTS,
+      };
+    }
+
+    return c.json({ success: true, config });
+  } catch (error) {
+    console.error('Error fetching schedule:', error);
+    return c.json({ error: 'Failed to fetch schedule', details: error.message }, 500);
+  }
+});
+
+app.post("/make-server-b87b0c07/admin/schedule", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { config } = body;
+
+    if (!config) {
+      return c.json({ error: 'Missing config' }, 400);
+    }
+
+    // Validate config structure
+    if (!Array.isArray(config.workingDays) || !Array.isArray(config.defaultSlots)) {
+      return c.json({ error: 'Invalid config structure' }, 400);
+    }
+
+    // Save to KV store
+    await kv.set('schedule:config', {
+      ...config,
+      updatedAt: new Date().toISOString(),
+    });
+
+    console.log('📅 Schedule config updated');
+
+    return c.json({ success: true, message: 'Schedule updated successfully' });
+  } catch (error) {
+    console.error('Error saving schedule:', error);
+    return c.json({ error: 'Failed to save schedule', details: error.message }, 500);
+  }
+});
+
+app.post("/make-server-b87b0c07/admin/schedule/slots", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { dateKey, slots, duration } = body;
+
+    if (!dateKey || !Array.isArray(slots)) {
+      return c.json({ error: 'Missing dateKey or slots' }, 400);
+    }
+
+    // Get current config
+    let config = await kv.get('schedule:config');
+    if (!config) {
+      config = {
+        workingDays: [1, 2, 3, 4, 5],
+        defaultSlots: DEFAULT_TIME_SLOTS,
+        defaultDuration: 50,
+        blockedDates: [],
+        customSlots: {},
+      };
+    }
+
+    // Update custom slots for the date
+    config.customSlots[dateKey] = {
+      slots: slots.sort(),
+      duration: duration || 50,
+    };
+    config.updatedAt = new Date().toISOString();
+
+    await kv.set('schedule:config', config);
+
+    console.log(`📅 Custom slots set for ${dateKey}: ${slots.join(', ')}`);
+
+    return c.json({ success: true, message: `Custom slots set for ${dateKey}` });
+  } catch (error) {
+    console.error('Error setting custom slots:', error);
+    return c.json({ error: 'Failed to set custom slots', details: error.message }, 500);
+  }
+});
+
+app.post("/make-server-b87b0c07/admin/schedule/block", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { dateKey, blocked } = body;
+
+    if (!dateKey) {
+      return c.json({ error: 'Missing dateKey' }, 400);
+    }
+
+    // Get current config
+    let config = await kv.get('schedule:config');
+    if (!config) {
+      config = {
+        workingDays: [1, 2, 3, 4, 5],
+        defaultSlots: DEFAULT_TIME_SLOTS,
+        defaultDuration: 50,
+        blockedDates: [],
+        customSlots: {},
+      };
+    }
+
+    if (blocked) {
+      // Add to blocked dates if not already there
+      if (!config.blockedDates.includes(dateKey)) {
+        config.blockedDates.push(dateKey);
+      }
+    } else {
+      // Remove from blocked dates
+      config.blockedDates = config.blockedDates.filter((d: string) => d !== dateKey);
+    }
+
+    config.updatedAt = new Date().toISOString();
+    await kv.set('schedule:config', config);
+
+    console.log(`📅 Date ${dateKey} ${blocked ? 'blocked' : 'unblocked'}`);
+
+    return c.json({
+      success: true,
+      message: `Date ${dateKey} ${blocked ? 'blocked' : 'unblocked'}`
+    });
+  } catch (error) {
+    console.error('Error blocking date:', error);
+    return c.json({ error: 'Failed to block date', details: error.message }, 500);
+  }
+});
+
+// ============ GIFT SESSIONS ENDPOINT ============
+
+app.post("/make-server-b87b0c07/admin/users/:email/gift", async (c) => {
+  try {
+    const email = c.req.param('email');
+    const body = await c.req.json();
+    const { sessions } = body;
+
+    if (!sessions || sessions < 1) {
+      return c.json({ error: 'Invalid number of sessions' }, 400);
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user's active package
+    const allPackages = await kv.getByPrefix('package:');
+    const userPackage = allPackages.find((p: any) =>
+      p.userId === normalizedEmail &&
+      (p.packageStatus === 'active' || p.packageStatus === 'pending')
+    );
+
+    if (!userPackage) {
+      return c.json({ error: 'No active package found for user' }, 404);
+    }
+
+    // Add gifted sessions
+    userPackage.totalSessions = (userPackage.totalSessions || 0) + sessions;
+    userPackage.remainingSessions = (userPackage.remainingSessions || 0) + sessions;
+    userPackage.giftedSessions = (userPackage.giftedSessions || 0) + sessions;
+    userPackage.updatedAt = new Date().toISOString();
+
+    await kv.set(userPackage.id, userPackage);
+
+    // Log the action
+    const auditKey = `audit:${Date.now()}`;
+    await kv.set(auditKey, {
+      action: 'gift_sessions',
+      adminEmail: 'admin',
+      targetType: 'package',
+      targetId: userPackage.id,
+      targetEmail: normalizedEmail,
+      details: { sessionsGifted: sessions },
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`🎁 Gifted ${sessions} sessions to ${normalizedEmail}`);
+
+    return c.json({
+      success: true,
+      message: `Gifted ${sessions} session(s) to ${normalizedEmail}`,
+      newTotal: userPackage.totalSessions,
+      newRemaining: userPackage.remainingSessions,
+    });
+  } catch (error) {
+    console.error('Error gifting sessions:', error);
+    return c.json({ error: 'Failed to gift sessions', details: error.message }, 500);
+  }
+});
+
+// ============ USER BLOCK/UNBLOCK ENDPOINT ============
+
+app.post("/make-server-b87b0c07/admin/users/:email/block", async (c) => {
+  try {
+    const email = c.req.param('email');
+    const body = await c.req.json();
+    const { blocked } = body;
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const userKey = `user:${normalizedEmail}`;
+    const user = await kv.get(userKey);
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    user.blocked = blocked;
+    user.updatedAt = new Date().toISOString();
+
+    await kv.set(userKey, user);
+
+    // Log the action
+    const auditKey = `audit:${Date.now()}`;
+    await kv.set(auditKey, {
+      action: blocked ? 'block_user' : 'unblock_user',
+      adminEmail: 'admin',
+      targetType: 'user',
+      targetId: userKey,
+      targetEmail: normalizedEmail,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`🚫 User ${normalizedEmail} ${blocked ? 'blocked' : 'unblocked'}`);
+
+    return c.json({
+      success: true,
+      message: `User ${normalizedEmail} ${blocked ? 'blocked' : 'unblocked'}`,
+    });
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    return c.json({ error: 'Failed to block user', details: error.message }, 500);
+  }
+});
+
+// ============ AUDIT LOG ENDPOINT ============
+
+app.get("/make-server-b87b0c07/admin/audit", async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '50');
+
+    // Get audit logs
+    const auditLogs = await kv.getByPrefix('audit:');
+
+    // Sort by timestamp descending and limit
+    const sortedLogs = auditLogs
+      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit);
+
+    return c.json({
+      success: true,
+      logs: sortedLogs,
+      total: auditLogs.length,
+    });
+  } catch (error) {
+    console.error('Error fetching audit log:', error);
+    return c.json({ error: 'Failed to fetch audit log', details: error.message }, 500);
+  }
+});
+
 // ============ SERVER STARTUP ============
 
 console.log('🚀 WellNest Pilates Server Starting...');

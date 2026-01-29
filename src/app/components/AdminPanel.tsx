@@ -4,6 +4,7 @@ import { logo } from '../../assets/images';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { DevTools } from './DevTools';
 import { BulkWaitlistUpload } from './BulkWaitlistUpload';
+import { getTimeSlotsForDate as getTimeSlotsFromConfig, calculateEndTime, DEFAULT_TIME_SLOTS } from '../config/timeSlots';
 
 export type UserStatus = 'pending' | 'confirmed' | 'cancelled' | 'no_show';
 
@@ -366,43 +367,15 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
   const dates = generateAdminDates();
 
-  // Date-specific time slots configuration
-  const DATE_SPECIFIC_SLOTS: Record<string, TimeSlot[]> = {
-    '1-29': [
-      { time: '18:15', maxCapacity: 4 },
-      { time: '19:15', maxCapacity: 4 },
-      { time: '20:15', maxCapacity: 4 },
-    ],
-    '1-30': [
-      { time: '18:00', maxCapacity: 4 },
-      { time: '19:00', maxCapacity: 4 },
-      { time: '20:00', maxCapacity: 4 },
-    ],
-  };
-
-  const defaultTimeSlots: TimeSlot[] = [
-    { time: '09:00', maxCapacity: 4 },
-    { time: '10:00', maxCapacity: 4 },
-    { time: '16:00', maxCapacity: 4 },
-    { time: '17:00', maxCapacity: 4 },
-    { time: '18:00', maxCapacity: 4 },
-    { time: '19:00', maxCapacity: 4 },
-    { time: '20:00', maxCapacity: 4 },
-  ];
-
-  // Get time slots for a specific date
+  // Get time slots for a specific date (uses shared config)
   const getTimeSlotsForDate = (dateKey: string): TimeSlot[] => {
-    return DATE_SPECIFIC_SLOTS[dateKey] || defaultTimeSlots;
+    const timeStrings = getTimeSlotsFromConfig(dateKey);
+    return timeStrings.map(time => ({ time, maxCapacity: 4 }));
   };
 
-  // Get end time based on date (45 min for Jan 30, 50 min otherwise)
+  // Get end time based on date (uses shared config)
   const getEndTime = (startTime: string, dateKey: string): string => {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const duration = dateKey === '1-30' ? 45 : 50;
-    const totalMinutes = hours * 60 + minutes + duration;
-    const endHours = Math.floor(totalMinutes / 60);
-    const endMinutes = totalMinutes % 60;
-    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+    return calculateEndTime(startTime, dateKey);
   };
 
   const maxDailyCapacity = 7 * 4; // Max 7 slots × 4 capacity = 28 max bookings per day

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, User, ArrowLeft, Loader } from 'lucide-react';
 import { Language, translations } from '../translations';
 import { logo } from '../../assets/images';
+import { getTimeSlotsForDate, calculateEndTime } from '../config/timeSlots';
 
 const rinaPhoto = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=600&fit=crop';
 
@@ -169,33 +170,20 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
   };
   
   const mockBookings = calculateBookingsPerSlot();
-  
-  // Standard time slots for all days (matching admin panel)
-  const standardTimeSlots = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
-  
-  // Function to calculate end time (50 minutes later)
-  const getEndTime = (startTime: string): string => {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const startMinutes = hours * 60 + minutes;
-    const endMinutes = startMinutes + 50;
-    const endHours = Math.floor(endMinutes / 60);
-    const endMins = endMinutes % 60;
-    return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+
+  // Function to calculate end time using shared config
+  const getEndTime = (startTime: string, dateKey: string): string => {
+    return calculateEndTime(startTime, dateKey);
   };
-  
+
   const getTimeSlotsForDay = (dayIndex: number): TimeSlot[] => {
     const selectedDateKey = tabs[dayIndex].key;
     const selectedDate = tabs[dayIndex].fullDate;
     const dayBookings = mockBookings[selectedDateKey] || {};
-    
-    // Filter out 09:00 time slot for January 29th
-    const timeSlotsForThisDay = standardTimeSlots.filter(time => {
-      if (selectedDateKey === '1-29' && time === '09:00') {
-        return false; // Remove 09:00 on January 29th
-      }
-      return true;
-    });
-    
+
+    // Get time slots for this specific date from shared config
+    const timeSlotsForThisDay = getTimeSlotsForDate(selectedDateKey);
+
     return timeSlotsForThisDay.map(time => {
       const bookedCount = dayBookings[time] || 0;
       const availableSpots = 4 - bookedCount;
@@ -311,7 +299,7 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
         {currentTimeSlots.map((slot) => {
           const isDisabled = slot.status === 'full' || slot.isPastOrTooSoon;
           const isPastTime = slot.isPastOrTooSoon && (slot.availableSpots === undefined || slot.availableSpots > 0);
-          
+
           return (
             <div
               key={slot.time}
@@ -322,7 +310,7 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
               <span className={`text-base font-medium ${
                 isPastTime ? 'text-gray-500' : 'text-[#3d2f28]'
               }`}>
-                {slot.time} - {getEndTime(slot.time)}
+                {slot.time} - {getEndTime(slot.time, tabs[selectedTab].key)}
               </span>
               <button
                 onClick={() => {
@@ -336,19 +324,23 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
                   }
                 }}
                 disabled={isDisabled}
-                className={`px-5 py-2.5 rounded-md text-xs transition-colors ${
+                className={`px-5 py-2.5 rounded-md text-sm font-semibold transition-colors ${
                   isPastTime
                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                     : slot.status === 'full'
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : slot.availableSpots === 1
+                    ? 'bg-orange-500 text-white hover:bg-orange-600'
+                    : slot.availableSpots === 2
+                    ? 'bg-yellow-500 text-white hover:bg-yellow-600'
                     : 'bg-[#9ca571] text-white hover:bg-[#8a9463]'
                 }`}
               >
                 {isPastTime
                   ? t.timePassed || 'Kaluar'
-                  : slot.status === 'full' 
-                  ? t.noSpots
-                  : t.bookNow}
+                  : slot.status === 'full'
+                  ? t.noSpots || 'Pa vende'
+                  : `${slot.availableSpots} ${t.outOf || 'out of'} 4`}
               </button>
             </div>
           );

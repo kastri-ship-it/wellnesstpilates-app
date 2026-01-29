@@ -14,7 +14,7 @@ import { MemberActivationModal } from './MemberActivationModal';
 import { LoginRegisterModal } from './LoginRegisterModal';
 import { UserDashboard } from './UserDashboard';
 import { AdminLogin } from './AdminLogin';
-import { AdminPanel } from './AdminPanel';
+import { AdminPanelV2 } from './admin/AdminPanelV2';
 import { PasswordSetupPage } from './PasswordSetupPage';
 import { LoginPage } from './LoginPage';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
@@ -376,7 +376,7 @@ export function MainApp() {
       )}
 
       {screen.type === 'adminPanel' && (
-        <AdminPanel onLogout={handleBack} />
+        <AdminPanelV2 onLogout={handleBack} />
       )}
 
       {/* Member Activation Modal */}

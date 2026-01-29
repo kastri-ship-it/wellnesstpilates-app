@@ -3,6 +3,7 @@ import { ArrowLeft, Check, ChevronDown, ChevronUp, CheckCircle, X, Calendar, Clo
 import { Language, translations } from '@/app/translations';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { logo } from '../../assets/images';
+import { getTimeSlotsForDate } from '../config/timeSlots';
 
 type PackageOverviewProps = {
   onBack: () => void;
@@ -267,13 +268,6 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       const now = new Date();
       const startDate = new Date(2026, 0, 29); // January 29, 2026 (month is 0-indexed)
 
-      // Date-specific time slots
-      const DATE_SPECIFIC_SLOTS: Record<string, string[]> = {
-        '1-29': ['18:15', '19:15', '20:15'],  // January 29
-        '1-30': ['18:00', '19:00', '20:00'],  // January 30
-      };
-      const defaultTimeSlots = ['09:00', '10:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
-
       let daysAdded = 0;
       let daysChecked = 0;
       const maxDaysToCheck = 10; // Check up to 10 days ahead to find 2 weekdays
@@ -295,8 +289,8 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
           (b.reservationStatus === 'confirmed' || b.reservationStatus === 'attended' || b.reservationStatus === 'pending')
         );
 
-        // Get time slots for this specific date
-        const timeSlotsForThisDay = DATE_SPECIFIC_SLOTS[dateKey] || defaultTimeSlots;
+        // Get time slots for this specific date (uses shared config)
+        const timeSlotsForThisDay = getTimeSlotsForDate(dateKey);
         
         const availableTimeSlots = timeSlotsForThisDay.map(time => {
           // Calculate actual seats occupied for this time slot
