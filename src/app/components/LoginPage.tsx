@@ -122,22 +122,9 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
           </button>
         </form>
 
-        <div className="mt-6 text-center space-y-3">
-          <p className="text-sm text-[#6b5949]">
-            Don't have an account?{' '}
-            <button
-              onClick={onBack}
-              className="text-[#9ca571] hover:underline font-medium"
-            >
-              Book a package
-            </button>
-          </p>
-          
-          <div className="pt-3 border-t border-[#e8e6e3]">
-            <p className="text-xs text-[#8b7764]">
-              Haven't completed registration? Check your email for the setup link.
-            </p>
-          </div>
+        <div className="mt-6 text-center pt-3 border-t border-[#e8e6e3]">
+          <p className="text-xs text-[#8b7764] mb-1">Need help?</p>
+          <p className="text-xs text-[#6b5949]">Contact us at info@wellnestpilates.mk</p>
         </div>
       </div>
     </div>
