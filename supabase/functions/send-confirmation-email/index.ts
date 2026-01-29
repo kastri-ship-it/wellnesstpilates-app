@@ -29,7 +29,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { to, customerName, packageType, packagePrice, bookingDate, bookingTime, language = "sq" } = body;
+    const { to, customerName, packageType, packagePrice, bookingDate, bookingTime, language = "sq", bonusClasses = 0 } = body;
 
     if (!to || !customerName || !packageType) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -45,64 +45,35 @@ serve(async (req) => {
       });
     }
 
-    const totalClasses = parseInt(packageType) + 1;
+    const packageSize = parseInt(packageType);
+    const totalClasses = packageSize + bonusClasses;
+    const hasBonusSession = bonusClasses > 0;
     const isEn = language === "en";
     const formattedDate = formatDate(bookingDate, language);
-    
-    const subject = isEn 
-      ? "Booking Confirmed - " + packageType + " Classes + 1 FREE"
-      : "Rezervimi u Konfirmua - " + packageType + " Klase + 1 FALAS";
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Georgia,'Times New Roman',serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
-          
-          <!-- Header with Logo -->
-          <tr>
-            <td style="background:#3E2B22;padding:50px 40px;text-align:center;">
-              <img src="https://i.ibb.co/tT95h4s2/unnamed.png" alt="WellNest Pilates" style="max-width:100%;height:auto;display:block;margin:0 auto;">
-            </td>
-          </tr>
-          
-          <!-- Main Content -->
-          <tr>
-            <td style="padding:50px 50px 30px;">
-              
-              <!-- Greeting -->
-              <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:normal;color:#2d2d2d;margin:0 0 15px;">
-                ${isEn ? "Hello" : "Pershendetje"}, ${customerName}
-              </h1>
-              
-              <p style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#555555;line-height:1.7;margin:0 0 30px;">
-                ${isEn 
-                  ? "Thank you for booking with us. Your reservation is now confirmed." 
-                  : "Faleminderit qe u regjistruat ne listen tone. Rezervimi juaj eshte konfirmuar."}
-              </p>
-              
-              <!-- Booking Details Box -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border:1px solid #e5e5e5;border-radius:6px;margin-bottom:30px;">
-                <tr>
-                  <td style="padding:30px;">
-                    
+    // Subject line - different based on bonus
+    const subject = hasBonusSession
+      ? (isEn
+          ? "Booking Confirmed - " + packageType + " Classes + 1 FREE"
+          : "Rezervimi u Konfirmua - " + packageType + " Klase + 1 FALAS")
+      : (isEn
+          ? "Booking Confirmed - " + packageType + " Classes"
+          : "Rezervimi u Konfirmua - " + packageType + " Klase");
+
+    // Build details section based on whether there's a bonus
+    const detailsHTML = hasBonusSession
+      ? `
                     <p style="font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#888888;margin:0 0 8px;">
                       ${isEn ? "PACKAGE" : "PAKETA"}
                     </p>
                     <p style="font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#2d2d2d;margin:0 0 20px;font-weight:600;">
                       ${packageType} ${isEn ? "classes" : "klase"}
                     </p>
-                    
+
                     <p style="font-family:Arial,sans-serif;font-size:13px;color:#4CAF50;font-weight:600;margin:0 0 20px;">
-                      +1 ${isEn ? "FREE CLASS" : "KLASE FALAS"}!
+                      +${bonusClasses} ${isEn ? "FREE CLASS" : "KLASE FALAS"}!
                     </p>
-                    
+
                     <div style="border-top:1px solid #e5e5e5;padding-top:20px;margin-top:10px;">
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
@@ -116,7 +87,7 @@ serve(async (req) => {
                           </td>
                           <td width="50%">
                             <p style="font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#888888;margin:0 0 8px;">
-                              ${isEn ? "PRICE" : "CMIMI"}
+                              ${isEn ? "PRICE" : "ÇMIMI"}
                             </p>
                             <p style="font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#2d2d2d;margin:0;">
                               ${packagePrice} DEN
@@ -125,7 +96,65 @@ serve(async (req) => {
                         </tr>
                       </table>
                     </div>
-                    
+      `
+      : `
+                    <p style="font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#888888;margin:0 0 8px;">
+                      ${isEn ? "PACKAGE" : "PAKETA"}
+                    </p>
+                    <p style="font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#2d2d2d;margin:0 0 20px;font-weight:600;">
+                      ${packageType} ${isEn ? "classes" : "klase"}
+                    </p>
+
+                    <div style="border-top:1px solid #e5e5e5;padding-top:20px;margin-top:10px;">
+                      <p style="font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#888888;margin:0 0 8px;">
+                        ${isEn ? "PRICE" : "ÇMIMI"}
+                      </p>
+                      <p style="font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#2d2d2d;margin:0;">
+                        ${packagePrice} DEN
+                      </p>
+                    </div>
+      `;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Georgia,'Times New Roman',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+
+          <!-- Header with Logo -->
+          <tr>
+            <td style="background:#3E2B22;padding:50px 40px;text-align:center;">
+              <img src="https://i.ibb.co/tT95h4s2/unnamed.png" alt="WellNest Pilates" style="max-width:100%;height:auto;display:block;margin:0 auto;">
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding:50px 50px 30px;">
+
+              <!-- Greeting -->
+              <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:normal;color:#2d2d2d;margin:0 0 15px;">
+                ${isEn ? "Hello" : "Pershendetje"}, ${customerName}
+              </h1>
+
+              <p style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#555555;line-height:1.7;margin:0 0 30px;">
+                ${isEn
+                  ? "Thank you for booking with us. Your reservation is now confirmed."
+                  : "Faleminderit qe u regjistruat ne listen tone. Rezervimi juaj eshte konfirmuar."}
+              </p>
+
+              <!-- Booking Details Box -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border:1px solid #e5e5e5;border-radius:6px;margin-bottom:30px;">
+                <tr>
+                  <td style="padding:30px;">
+                    ${detailsHTML}
+
                     <div style="border-top:1px solid #e5e5e5;padding-top:20px;margin-top:20px;">
                       <p style="font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#888888;margin:0 0 8px;">
                         ${isEn ? "FIRST CLASS" : "KLASA E PARE"}
@@ -137,21 +166,21 @@ serve(async (req) => {
                         ${isEn ? "at" : "ora"} ${bookingTime}
                       </p>
                     </div>
-                    
+
                   </td>
                 </tr>
               </table>
-              
+
               <!-- Instructions -->
               <p style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#555555;line-height:1.7;margin:0 0 10px;">
                 <strong>${isEn ? "What to bring:" : "Cfare te sillni:"}</strong>
               </p>
               <p style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#555555;line-height:1.7;margin:0 0 30px;">
-                ${isEn 
+                ${isEn
                   ? "Please arrive 10 minutes early. Bring a towel and water bottle."
                   : "Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji."}
               </p>
-              
+
               <!-- Signature -->
               <p style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#555555;margin:0 0 5px;">
                 ${isEn ? "With respect," : "Me respekt,"}
@@ -159,10 +188,10 @@ serve(async (req) => {
               <p style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#2d2d2d;font-weight:600;margin:0;">
                 ${isEn ? "The Wellnest Pilates Team" : "Ekipi i Wellnest Pilates"}
               </p>
-              
+
             </td>
           </tr>
-          
+
           <!-- Footer -->
           <tr>
             <td style="background:#fafafa;padding:25px 50px;border-top:1px solid #e5e5e5;">
@@ -174,7 +203,7 @@ serve(async (req) => {
               </p>
             </td>
           </tr>
-          
+
         </table>
       </td>
     </tr>
@@ -182,7 +211,7 @@ serve(async (req) => {
 </body>
 </html>`;
 
-    console.log("Sending email to:", to);
+    console.log("Sending email to:", to, "bonusClasses:", bonusClasses);
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",

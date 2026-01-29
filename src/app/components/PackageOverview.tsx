@@ -21,6 +21,7 @@ type PackageData = {
   packageId: string;
   activationCode: string;
   packageType: string;
+  bonusClasses?: number;
 };
 
 type DateSlot = {
@@ -68,6 +69,7 @@ const sendConfirmationEmail = async (emailData: {
   packagePrice: string;
   bookingDate: string;
   bookingTime: string;
+  bonusClasses?: number;
 }) => {
   try {
     const response = await fetch(
@@ -81,11 +83,12 @@ const sendConfirmationEmail = async (emailData: {
         body: JSON.stringify({
           ...emailData,
           language: language,
+          bonusClasses: emailData.bonusClasses || 0,
         }),
       }
     );
     const data = await response.json();
-    console.log('📧 Confirmation email sent:', data);
+    console.log('📧 Confirmation email sent:', data, 'bonusClasses:', emailData.bonusClasses);
   } catch (error) {
     console.error('❌ Failed to send confirmation email:', error);
   }
@@ -225,11 +228,12 @@ const sendConfirmationEmail = async (emailData: {
       console.log('✅ Package created:', data.packageId);
       console.log('📧 Activation code sent to email:', formData.email);
 
-      // Store package data
+      // Store package data (including bonusClasses from coupon)
       setPackageData({
         packageId: data.packageId,
         activationCode: data.activationCode,
         packageType: packageType,
+        bonusClasses: data.bonusClasses || 0,
       });
 
       // Show package created popup with option to book first session
@@ -422,6 +426,7 @@ console.log('✅ Package & first session booked successfully!');
         packagePrice: packagePrices[packageData.packageType] || '0',
         bookingDate: dateKey,
         bookingTime: timeSlot,
+        bonusClasses: packageData.bonusClasses || 0,
       });
       
       // Check if this is preview mode
