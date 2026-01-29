@@ -996,6 +996,7 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
       } else {
         console.log(`⚠️ Coupon ${normalizedCoupon} not found in redemption_codes table`);
       }
+    }
 
     const activationCode = generateActivationCode();
     const codeKey = `activation_code:${activationCode}`;
