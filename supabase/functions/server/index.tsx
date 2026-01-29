@@ -517,6 +517,266 @@ async function sendRegistrationEmail(
   return sendEmail(email, t.subject, content, language);
 }
 
+// ============ NEW EMAIL FUNCTIONS FOR BOOKING SYSTEM ============
+
+function formatDateForEmail(dateKey: string, language: string): string {
+  const months: Record<string, string[]> = {
+    SQ: ["Janar", "Shkurt", "Mars", "Prill", "Maj", "Qershor", "Korrik", "Gusht", "Shtator", "Tetor", "Nëntor", "Dhjetor"],
+    MK: ["Јануари", "Февруари", "Март", "Април", "Мај", "Јуни", "Јули", "Август", "Септември", "Октомври", "Ноември", "Декември"],
+    EN: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  };
+  const parts = dateKey.split("-");
+  if (parts.length === 2) {
+    const month = parseInt(parts[0]) - 1;
+    const day = parts[1];
+    const lang = language.toUpperCase();
+    const monthName = months[lang]?.[month] || months["EN"][month];
+    return day + " " + monthName + " 2026";
+  }
+  return dateKey;
+}
+
+async function sendSingleSessionEmail(email: string, name: string, dateKey: string, timeSlot: string, language: string = 'EN') {
+  const lang = language.toUpperCase() as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
+  const formattedDate = formatDateForEmail(dateKey, language);
+  const endTime = calculateEndTime(timeSlot);
+
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.greeting}, ${name}!</h2>
+
+    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
+      ${lang === 'SQ' ? 'Faleminderit që rezervuat! Rezervimi juaj është konfirmuar.'
+        : lang === 'MK' ? 'Ви благодариме за резервацијата! Вашата резервација е потврдена.'
+        : 'Thank you for booking! Your reservation is confirmed.'}
+    </p>
+
+    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${t.yourSession}</h3>
+      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
+        <strong>${t.date}:</strong> ${formattedDate}<br>
+        <strong>${t.time}:</strong> ${timeSlot} - ${endTime}
+      </p>
+    </div>
+
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 24px 0;">
+      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+        <strong>${t.important}:</strong><br>
+        ${lang === 'SQ' ? 'Ju lutem arrini 10 minuta para fillimit. Sillni peshqir dhe shishe uji.'
+          : lang === 'MK' ? 'Ве молиме дојдете 10 минути порано. Донесете крпа и шише вода.'
+          : 'Please arrive 10 minutes early. Bring a towel and water bottle.'}
+      </p>
+    </div>
+
+    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+      ${t.lookForward}
+    </p>
+  `;
+
+  const subject = lang === 'SQ' ? 'Rezervimi u Konfirmua - WellNest Pilates'
+    : lang === 'MK' ? 'Резервацијата е потврдена - WellNest Pilates'
+    : 'Booking Confirmed - WellNest Pilates';
+
+  return sendEmail(email, subject, content, language);
+}
+
+async function sendPackageBookingEmail(email: string, name: string, packageType: string, dateKey: string, timeSlot: string, language: string = 'EN') {
+  const lang = language.toUpperCase() as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
+  const formattedDate = formatDateForEmail(dateKey, language);
+  const endTime = calculateEndTime(timeSlot);
+
+  // Get package details
+  const packageSessions = packageType.includes('8') ? '8' : packageType.includes('10') ? '10' : '12';
+  const packagePrice = packageType.includes('8') ? '3500' : packageType.includes('10') ? '4200' : '4800';
+
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.greeting}, ${name}!</h2>
+
+    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
+      ${lang === 'SQ' ? 'Faleminderit që zgjodhët paketën tonë! Rezervimi juaj u regjistrua me sukses.'
+        : lang === 'MK' ? 'Ви благодариме што го избравте нашиот пакет! Вашата резервација е успешно регистрирана.'
+        : 'Thank you for choosing our package! Your booking has been successfully registered.'}
+    </p>
+
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <p style="margin: 0 0 8px 0; color: #8b7764; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;">
+        ${lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE'}
+      </p>
+      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 20px; font-weight: 600;">
+        ${packageSessions} ${lang === 'SQ' ? 'klase' : lang === 'MK' ? 'часови' : 'classes'}
+      </p>
+      <p style="margin: 0; color: #4CAF50; font-size: 13px; font-weight: 600;">
+        +1 ${lang === 'SQ' ? 'KLASE FALAS' : lang === 'MK' ? 'БЕСПЛАТЕН ЧАС' : 'FREE CLASS'}!
+      </p>
+      <div style="border-top: 1px solid #e5e5e5; margin-top: 16px; padding-top: 16px;">
+        <p style="margin: 0; color: #3d2f28; font-size: 18px;">
+          ${lang === 'SQ' ? 'Totali' : lang === 'MK' ? 'Вкупно' : 'Total'}: ${packagePrice} DEN
+        </p>
+      </div>
+    </div>
+
+    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">📅 ${lang === 'SQ' ? 'Klasa e Parë' : lang === 'MK' ? 'Прв Час' : 'First Class'}</h3>
+      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.6;">
+        <strong>${t.date}:</strong> ${formattedDate}<br>
+        <strong>${t.time}:</strong> ${timeSlot} - ${endTime}
+      </p>
+    </div>
+
+    <div style="background-color: #fff8f0; border-left: 4px solid #ff9800; padding: 20px; margin: 24px 0;">
+      <h3 style="margin: 0 0 12px 0; color: #e65100; font-size: 16px;">⏳ ${lang === 'SQ' ? 'Hapi i Radhës' : lang === 'MK' ? 'Следен Чекор' : 'Next Step'}</h3>
+      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.6;">
+        ${lang === 'SQ' ? 'Ju lutem vizitoni studion tonë për të paguar dhe aktivizuar paketën tuaj. Pasi të paguani, do të merrni kredencialet për të hyrë në llogarinë tuaj.'
+          : lang === 'MK' ? 'Ве молиме посетете го нашето студио за да платите и да го активирате вашиот пакет. Откако ќе платите, ќе ги добиете вашите податоци за најава.'
+          : 'Please visit our studio to pay and activate your package. Once paid, you will receive your login credentials.'}
+      </p>
+    </div>
+
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 20px; margin: 24px 0;">
+      <p style="margin: 0 0 12px 0; color: #3d2f28; font-size: 14px; font-weight: 600;">${lang === 'SQ' ? 'Vendndodhja' : lang === 'MK' ? 'Локација' : 'Location'}:</p>
+      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+        ${STUDIO_INFO.address}
+      </p>
+    </div>
+
+    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+      ${t.lookForward}
+    </p>
+  `;
+
+  const subject = lang === 'SQ' ? 'Paketa u Regjistrua - WellNest Pilates'
+    : lang === 'MK' ? 'Пакетот е регистриран - WellNest Pilates'
+    : 'Package Registered - WellNest Pilates';
+
+  return sendEmail(email, subject, content, language);
+}
+
+async function sendInquiryEmail(email: string, name: string, surname: string, mobile: string, serviceType: string, packageType: string, language: string = 'EN') {
+  const lang = language.toUpperCase() as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
+
+  const serviceLabel = serviceType === 'individual'
+    ? (lang === 'SQ' ? 'Trajnim Individual' : lang === 'MK' ? 'Индивидуална Тренинг' : 'Individual Training')
+    : (lang === 'SQ' ? 'Trajnim DUO' : lang === 'MK' ? 'ДУО Тренинг' : 'DUO Training');
+
+  const sessions = packageType.includes('1') ? '1' : packageType.includes('8') ? '8' : '12';
+
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">${t.greeting}, ${name}!</h2>
+
+    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
+      ${lang === 'SQ' ? 'Faleminderit për interesin tuaj! Kemi marrë kërkesën tuaj për'
+        : lang === 'MK' ? 'Ви благодариме за интересот! Ја примивме вашата барање за'
+        : 'Thank you for your interest! We have received your inquiry for'} ${serviceLabel}.
+    </p>
+
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 16px 0; color: #3d2f28; font-size: 18px;">📋 ${lang === 'SQ' ? 'Detajet e Kërkesës' : lang === 'MK' ? 'Детали за Барањето' : 'Inquiry Details'}</h3>
+      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.8;">
+        <strong>${lang === 'SQ' ? 'Shërbimi' : lang === 'MK' ? 'Услуга' : 'Service'}:</strong> ${serviceLabel}<br>
+        <strong>${lang === 'SQ' ? 'Paketa' : lang === 'MK' ? 'Пакет' : 'Package'}:</strong> ${sessions} ${lang === 'SQ' ? 'seanca' : lang === 'MK' ? 'сесии' : 'sessions'}
+      </p>
+    </div>
+
+    <div style="background-color: #e3f2fd; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 12px 0; color: #1565c0; font-size: 16px;">📞 ${lang === 'SQ' ? 'Çfarë Pritet Tani?' : lang === 'MK' ? 'Што Следи?' : 'What Happens Next?'}</h3>
+      <p style="margin: 0; color: #1976d2; font-size: 15px; line-height: 1.6;">
+        ${lang === 'SQ' ? 'Ekipi ynë do t\'ju kontaktojë brenda 24 orëve për të diskutuar disponueshmërinë dhe për të caktuar seancën tuaj.'
+          : lang === 'MK' ? 'Нашиот тим ќе ве контактира во рок од 24 часа за да разговарате за достапноста и да закажете ваша сесија.'
+          : 'Our team will contact you within 24 hours to discuss availability and schedule your session.'}
+      </p>
+    </div>
+
+    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+      ${t.questionsContact} ${STUDIO_INFO.email}
+    </p>
+  `;
+
+  const subject = lang === 'SQ' ? 'Kërkesa u Pranua - WellNest Pilates'
+    : lang === 'MK' ? 'Барањето е Примено - WellNest Pilates'
+    : 'Inquiry Received - WellNest Pilates';
+
+  return sendEmail(email, subject, content, language);
+}
+
+async function sendStudioInquiryNotification(customerEmail: string, customerName: string, customerSurname: string, customerMobile: string, serviceType: string, packageType: string) {
+  const sessions = packageType.includes('1') ? '1' : packageType.includes('8') ? '8' : '12';
+  const serviceLabel = serviceType === 'individual' ? 'Individual Training' : 'DUO Training';
+
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">📩 New ${serviceLabel} Inquiry</h2>
+
+    <div style="background-color: #f5f0ed; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 16px 0; color: #3d2f28; font-size: 18px;">Customer Details</h3>
+      <p style="margin: 0; color: #6b5949; font-size: 15px; line-height: 1.8;">
+        <strong>Name:</strong> ${customerName} ${customerSurname}<br>
+        <strong>Email:</strong> ${customerEmail}<br>
+        <strong>Mobile:</strong> ${customerMobile}<br>
+        <strong>Service:</strong> ${serviceLabel}<br>
+        <strong>Package:</strong> ${sessions} sessions
+      </p>
+    </div>
+
+    <div style="background-color: #fff8f0; border-left: 4px solid #ff9800; padding: 20px; margin: 24px 0;">
+      <p style="margin: 0; color: #6b5949; font-size: 14px;">
+        <strong>Action Required:</strong> Please contact the customer within 24 hours to schedule their session.
+      </p>
+    </div>
+  `;
+
+  return sendEmail(STUDIO_INFO.email, `New ${serviceLabel} Inquiry - ${customerName} ${customerSurname}`, content, 'EN');
+}
+
+async function sendActivationCredentialsEmail(email: string, name: string, temporaryPassword: string, language: string = 'EN') {
+  const lang = language.toUpperCase() as keyof typeof EMAIL_TRANSLATIONS;
+  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
+
+  const content = `
+    <h2 style="margin: 0 0 20px 0; color: #3d2f28; font-size: 24px;">🎉 ${lang === 'SQ' ? 'Llogaria Juaj është Gati!' : lang === 'MK' ? 'Вашата Сметка е Подготвена!' : 'Your Account is Ready!'}</h2>
+
+    <p style="margin: 0 0 20px 0; color: #6b5949; font-size: 16px; line-height: 1.6;">
+      ${lang === 'SQ' ? 'Faleminderit për pagesën! Paketa juaj është aktivizuar dhe tani mund të hyni në llogarinë tuaj.'
+        : lang === 'MK' ? 'Ви благодариме за уплатата! Вашиот пакет е активиран и сега можете да се најавите на вашата сметка.'
+        : 'Thank you for your payment! Your package has been activated and you can now log in to your account.'}
+    </p>
+
+    <div style="background-color: #e8f5e9; border-radius: 12px; padding: 24px; margin: 24px 0;">
+      <h3 style="margin: 0 0 16px 0; color: #2e7d32; font-size: 18px;">🔐 ${lang === 'SQ' ? 'Kredencialet e Hyrjes' : lang === 'MK' ? 'Податоци за Најава' : 'Login Credentials'}</h3>
+      <p style="margin: 0; color: #1b5e20; font-size: 15px; line-height: 1.8;">
+        <strong>Email:</strong> ${email}<br>
+        <strong>${lang === 'SQ' ? 'Fjalëkalimi i Përkohshëm' : lang === 'MK' ? 'Привремена Лозинка' : 'Temporary Password'}:</strong>
+        <span style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #2e7d32;">${temporaryPassword}</span>
+      </p>
+    </div>
+
+    <div style="background-color: #fff8f0; border-left: 4px solid #ff9800; padding: 20px; margin: 24px 0;">
+      <p style="margin: 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+        <strong>${t.important}:</strong><br>
+        ${lang === 'SQ' ? 'Ju rekomandojmë të ndryshoni fjalëkalimin tuaj pas hyrjes së parë.'
+          : lang === 'MK' ? 'Ви препорачуваме да ја промените лозинката по првото најавување.'
+          : 'We recommend changing your password after your first login.'}
+      </p>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="https://wellnestpilates.com/#/login" style="display: inline-block; background-color: #9ca571; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+        ${lang === 'SQ' ? 'Hyni Tani' : lang === 'MK' ? 'Најави се Сега' : 'Login Now'}
+      </a>
+    </div>
+
+    <p style="margin: 20px 0 0 0; color: #6b5949; font-size: 14px; line-height: 1.6;">
+      ${t.lookForward}
+    </p>
+  `;
+
+  const subject = lang === 'SQ' ? 'Llogaria Juaj është Gati! - WellNest Pilates'
+    : lang === 'MK' ? 'Вашата Сметка е Подготвена! - WellNest Pilates'
+    : 'Your Account is Ready! - WellNest Pilates';
+
+  return sendEmail(email, subject, content, language);
+}
+
 // ============ HEALTH CHECK ============
 
 app.get("/make-server-b87b0c07/health", (c) => {
@@ -1778,7 +2038,114 @@ app.post("/make-server-b87b0c07/admin/resend-activation-code", async (c) => {
     });
   } catch (error) {
     console.error('Error resending activation code:', error);
-    return c.json({ error: 'Failed to resend activation code', details: error.message }, 500);
+    return c.json({ error: 'Failed to resend activation code', details: (error as Error).message }, 500);
+  }
+});
+
+// Admin activate package - generate password and send credentials
+app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { email, packageId } = body;
+
+    if (!email) {
+      return c.json({ error: "Email is required" }, 400);
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+
+    // Get user
+    const userKey = `user:${normalizedEmail}`;
+    const user = await kv.get(userKey);
+    if (!user) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    // Generate random 8-character alphanumeric password
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let temporaryPassword = '';
+    for (let i = 0; i < 8; i++) {
+      temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    // Hash and store password on user
+    const passwordHash = await hashPassword(temporaryPassword);
+    user.passwordHash = passwordHash;
+    user.verified = true;
+    user.updatedAt = new Date().toISOString();
+    await kv.set(userKey, user);
+    console.log(`Password set for user: ${normalizedEmail}`);
+
+    // If packageId provided, activate that specific package
+    if (packageId) {
+      const pkg = await kv.get(packageId);
+      if (pkg) {
+        pkg.packageStatus = 'active';
+        pkg.activationStatus = 'activated';
+        pkg.activationDate = new Date().toISOString();
+        pkg.expiryDate = calculateExpiry(pkg.activationDate);
+        pkg.paymentStatus = 'paid';
+        pkg.updatedAt = new Date().toISOString();
+        await kv.set(packageId, pkg);
+        console.log(`Package activated: ${packageId}`);
+
+        // Also activate first reservation if exists
+        if (pkg.firstReservationId) {
+          const firstReservation = await kv.get(pkg.firstReservationId);
+          if (firstReservation) {
+            firstReservation.reservationStatus = 'confirmed';
+            firstReservation.paymentStatus = 'paid';
+            firstReservation.activatedAt = new Date().toISOString();
+            firstReservation.updatedAt = new Date().toISOString();
+            await kv.set(pkg.firstReservationId, firstReservation);
+          }
+        }
+      }
+    } else {
+      // Activate all pending packages for this user
+      const allPackages = await kv.getByPrefix('package:');
+      const userPackages = allPackages.filter((pkg: any) =>
+        pkg.userId === normalizedEmail && pkg.packageStatus === 'pending'
+      );
+
+      for (const pkg of userPackages) {
+        pkg.packageStatus = 'active';
+        pkg.activationStatus = 'activated';
+        pkg.activationDate = new Date().toISOString();
+        pkg.expiryDate = calculateExpiry(pkg.activationDate);
+        pkg.paymentStatus = 'paid';
+        pkg.updatedAt = new Date().toISOString();
+        await kv.set(pkg.id, pkg);
+        console.log(`Package activated: ${pkg.id}`);
+      }
+    }
+
+    // Determine language from user's last reservation or default to EN
+    let language = 'EN';
+    const allReservations = await kv.getByPrefix('reservation:');
+    const userReservation = allReservations.find((r: any) => r.userId === normalizedEmail);
+    if (userReservation && userReservation.language) {
+      language = userReservation.language.toUpperCase();
+    }
+
+    // Send email with login credentials
+    try {
+      await sendActivationCredentialsEmail(normalizedEmail, user.name, temporaryPassword, language);
+      console.log(`Activation credentials email sent to: ${normalizedEmail}`);
+    } catch (emailError) {
+      console.error('Failed to send credentials email:', emailError);
+      // Don't fail - password is set, email is just notification
+    }
+
+    return c.json({
+      success: true,
+      message: 'Package activated and credentials sent!',
+      email: normalizedEmail,
+      temporaryPassword, // Only return this for admin display if needed
+    });
+  } catch (error) {
+    console.error('Error activating package:', error);
+    return c.json({ error: 'Failed to activate package', details: (error as Error).message }, 500);
   }
 });
 
@@ -1810,14 +2177,10 @@ app.get("/make-server-b87b0c07/bookings", async (c) => {
 app.post("/make-server-b87b0c07/bookings", async (c) => {
   try {
     const body = await c.req.json();
-    const { dateKey, timeSlot, instructor, name, surname, email, mobile, password, language } = body;
+    const { dateKey, timeSlot, instructor, name, surname, email, mobile, language, selectedPackage } = body;
 
-    if (!dateKey || !timeSlot || !instructor || !name || !surname || !email || !mobile || !password) {
+    if (!dateKey || !timeSlot || !instructor || !name || !surname || !email || !mobile) {
       return c.json({ error: "Missing required fields" }, 400);
-    }
-
-    if (password.length < 6) {
-      return c.json({ error: "Password must be at least 6 characters" }, 400);
     }
 
     const normalizedEmail = normalizeEmail(email);
@@ -1839,44 +2202,30 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
       return c.json({ error: "You already have a booking at this time" }, 400);
     }
 
-    const passwordHash = await hashPassword(password);
-
+    // Only create user record for package bookings (no password - will be set on activation)
     const userKey = `user:${normalizedEmail}`;
     let user = await kv.get(userKey);
-    
-    if (!user) {
-      user = {
-        id: userKey,
-        email: normalizedEmail,
-        name,
-        surname,
-        mobile,
-        passwordHash,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        blocked: false,
-        verified: true
-      };
-      await kv.set(userKey, user);
-      console.log(`User created during booking: ${normalizedEmail}`);
-    } else if (!user.passwordHash) {
-      user.passwordHash = passwordHash;
-      user.verified = true;
-      user.updatedAt = new Date().toISOString();
-      await kv.set(userKey, user);
-      console.log(`Password set for existing user: ${normalizedEmail}`);
-    }
 
-    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
-    const sessionKey = `session:${sessionToken}`;
-    const sessionData = {
-      id: sessionKey,
-      token: sessionToken,
-      email: normalizedEmail,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    };
-    await kv.set(sessionKey, sessionData);
+    if (selectedPackage) {
+      // Package booking: create user WITHOUT password (password set on activation)
+      if (!user) {
+        user = {
+          id: userKey,
+          email: normalizedEmail,
+          name,
+          surname,
+          mobile,
+          passwordHash: null, // No password - will be set on admin activation
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          blocked: false,
+          verified: false // Not verified until activation
+        };
+        await kv.set(userKey, user);
+        console.log(`User created for package booking (no password): ${normalizedEmail}`);
+      }
+    }
+    // For single sessions: NO user creation - just the reservation
 
     const dateString = formatDateString(dateKey);
     const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1922,22 +2271,85 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
     await kv.set(reservationId, reservation);
     console.log(`Booking created and confirmed: ${reservationId}`);
 
+    // Send confirmation email based on booking type
+    const langCode = (language || 'en').toUpperCase();
+    try {
+      if (selectedPackage) {
+        // Package booking: send "awaiting payment" confirmation
+        await sendPackageBookingEmail(normalizedEmail, name, selectedPackage, dateKey, timeSlot, langCode);
+        console.log(`Package booking confirmation email sent to: ${normalizedEmail}`);
+      } else {
+        // Single session: send reservation confirmation
+        await sendSingleSessionEmail(normalizedEmail, name, dateKey, timeSlot, langCode);
+        console.log(`Single session confirmation email sent to: ${normalizedEmail}`);
+      }
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+      // Don't fail the booking if email fails
+    }
+
     return c.json({
       success: true,
       reservation,
-      session: sessionToken,
-      user: {
-        email: normalizedEmail,
-        name,
-        surname,
-        mobile
-      },
-      message: "Booking confirmed! You are now logged in."
+      message: selectedPackage
+        ? "Rezervimi u regjistrua! Ju lutem vizitoni studion për pagesë dhe aktivizim."
+        : "Rezervimi u konfirmua!"
     });
 
   } catch (error) {
     console.error('Error creating booking:', error);
-    return c.json({ error: 'Failed to create booking', details: error.message }, 500);
+    return c.json({ error: 'Failed to create booking', details: (error as Error).message }, 500);
+  }
+});
+
+// ============ INQUIRY ENDPOINT (Individual/DUO) ============
+
+app.post("/make-server-b87b0c07/inquiry", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { name, surname, email, mobile, serviceType, packageType, language } = body;
+
+    // Validate required fields
+    if (!name || !surname || !email || !mobile || !serviceType || !packageType) {
+      return c.json({ error: "Missing required fields" }, 400);
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    const langCode = (language || 'en').toUpperCase();
+
+    console.log(`📩 New inquiry received:`, { name, surname, email: normalizedEmail, serviceType, packageType });
+
+    // Send email notification to studio
+    try {
+      await sendStudioInquiryNotification(normalizedEmail, name, surname, mobile, serviceType, packageType);
+      console.log(`✅ Studio notification email sent for inquiry from: ${normalizedEmail}`);
+    } catch (studioEmailError) {
+      console.error('Failed to send studio notification:', studioEmailError);
+      // Continue - don't fail the inquiry if studio email fails
+    }
+
+    // Send confirmation email to customer
+    try {
+      await sendInquiryEmail(normalizedEmail, name, surname, mobile, serviceType, packageType, langCode);
+      console.log(`✅ Customer confirmation email sent to: ${normalizedEmail}`);
+    } catch (customerEmailError) {
+      console.error('Failed to send customer email:', customerEmailError);
+      // Continue - don't fail the inquiry if customer email fails
+    }
+
+    // Return success - NO reservation created, just emails sent
+    return c.json({
+      success: true,
+      message: langCode === 'SQ'
+        ? "Kërkesa u pranua! Ekipi ynë do t'ju kontaktojë së shpejti."
+        : langCode === 'MK'
+        ? "Барањето е примено! Нашиот тим ќе ве контактира наскоро."
+        : "Inquiry received! Our team will contact you shortly."
+    });
+
+  } catch (error) {
+    console.error('Error processing inquiry:', error);
+    return c.json({ error: 'Failed to process inquiry', details: (error as Error).message }, 500);
   }
 });
 
@@ -2212,7 +2624,7 @@ app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
     const body = await c.req.json();
     const { token, password } = body;
 
-    if (!token || !password) {
+    if (!token) {
       return c.json({ error: "Token and password are required" }, 400);
     }
 
@@ -2294,7 +2706,7 @@ app.post("/make-server-b87b0c07/auth/register", async (c) => {
     const body = await c.req.json();
     const { email, password, name, surname, mobile } = body;
     
-    if (!email || !password) {
+    if (!email) {
       return c.json({ error: 'Email and password are required' }, 400);
     }
     
@@ -2352,7 +2764,7 @@ app.post("/make-server-b87b0c07/auth/login", async (c) => {
     const body = await c.req.json();
     const { email, password } = body;
 
-    if (!email || !password) {
+    if (!email) {
       return c.json({ error: "Email and password are required" }, 400);
     }
 

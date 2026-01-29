@@ -144,27 +144,10 @@ export function MainApp() {
   };
 
   const handleConfirmBooking = (bookingData: any) => {
-    // Check if user was auto-logged in (session token in localStorage)
-    const session = localStorage.getItem('wellnest_session');
-    const userStr = localStorage.getItem('wellnest_user');
-    
-    if (session && userStr) {
-      // User was auto-logged in, go to dashboard
-      const user = JSON.parse(userStr);
-      setUserSession(session);
-      setCurrentUser(user);
-      console.log('✅ User auto-logged in after booking, redirecting to dashboard');
-      
-      setScreen({
-        type: 'userDashboard',
-        userEmail: user.email,
-        userName: user.name,
-        userSurname: user.surname
-      });
-    } else {
-      // No session, show success screen
-      setScreen({ type: 'success', bookingData });
-    }
+    // No auto-login after booking - user must wait for admin activation
+    // Always show success screen with appropriate message
+    console.log('✅ Booking confirmed, showing success screen');
+    setScreen({ type: 'success', bookingData });
   };
 
   const handleInstructorClick = (instructorName: string) => {

@@ -82,7 +82,7 @@ export function IndividualTraining({ onBack, language, onLogoClick }: Individual
 
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/bookings`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/inquiry`,
         {
           method: 'POST',
           headers: {
@@ -94,12 +94,8 @@ export function IndividualTraining({ onBack, language, onLogoClick }: Individual
             surname: formData.surname,
             mobile: formData.mobile,
             email: formData.email,
-            date: new Date().toLocaleDateString(),
-            dateKey: 'individual',
-            timeSlot: 'individual',
-            instructor: 'Rina Krasniqi',
-            selectedPackage: packageType,
-            payInStudio: formData.payInStudio,
+            serviceType: 'individual',
+            packageType: packageType,
             language,
           }),
         }
@@ -153,9 +149,9 @@ export function IndividualTraining({ onBack, language, onLogoClick }: Individual
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <h2 className="text-xl font-semibold text-[#3d2f28] mb-2 tracking-tight">{t.bookingConfirmed || 'Booking Confirmed!'}</h2>
+            <h2 className="text-xl font-semibold text-[#3d2f28] mb-2 tracking-tight">{t.inquiryReceived || 'Inquiry Received!'}</h2>
             <p className="text-sm text-[#6b5949] mb-5 leading-relaxed">
-              {t.bookingConfirmedDesc || 'Your booking has been successfully registered. You can log in to your account to manage your bookings.'}
+              {t.inquiryReceivedDesc || 'Thank you for your interest! Our team will contact you within 24 hours to schedule your session.'}
             </p>
             <button
               onClick={() => setShowSuccessPopup(false)}

@@ -5,14 +5,73 @@ import { logo } from '../../assets/images';
 
 type SuccessScreenProps = {
   bookingData: BookingData;
-  onViewOther: () => void;
-  onViewPackages: () => void;
+  onViewOther?: () => void;
+  onViewPackages?: () => void;
   onBack: () => void;
   language: Language;
 };
 
 export function SuccessScreen({ bookingData, onViewOther, onViewPackages, onBack, language }: SuccessScreenProps) {
   const t = translations[language];
+
+  // Determine if this is a package booking or single session
+  const isPackageBooking = !!bookingData.selectedPackage;
+
+  // Get service-specific messages
+  const getSuccessTitle = () => {
+    if (isPackageBooking) {
+      return language === 'SQ'
+        ? 'Paketa u Regjistrua!'
+        : language === 'MK'
+        ? 'Пакетот е Регистриран!'
+        : 'Package Registered!';
+    }
+    return t.reservationConfirmed || 'Reservation Confirmed!';
+  };
+
+  const getSuccessMessage = () => {
+    if (isPackageBooking) {
+      return language === 'SQ'
+        ? 'Faleminderit! Na vizitoni për të paguar dhe aktivizuar paketën tuaj. Do të merrni kredencialet për hyrje pas pagesës.'
+        : language === 'MK'
+        ? 'Ви благодариме! Посетете нè за да ја платите и активирате вашата пакет. Ќе ги добиете вашите податоци за најава по уплатата.'
+        : 'Thank you! Please visit us to pay and activate your package. You will receive your login credentials after payment.';
+    }
+    return language === 'SQ'
+      ? 'Rezervimi juaj u konfirmua! Ju presim në studio.'
+      : language === 'MK'
+      ? 'Вашата резервација е потврдена! Ве очекуваме во студиото.'
+      : 'Your reservation is confirmed! We look forward to seeing you at the studio.';
+  };
+
+  const getNextSteps = () => {
+    if (isPackageBooking) {
+      return [
+        language === 'SQ'
+          ? 'Ejani në studio për të paguar paketën'
+          : language === 'MK'
+          ? 'Дојдете во студиото за да го платите пакетот'
+          : 'Visit the studio to pay for your package',
+        language === 'SQ'
+          ? 'Do të merrni email me kredencialet pas pagesës'
+          : language === 'MK'
+          ? 'Ќе добиете емаил со податоци за најава по уплатата'
+          : 'You will receive an email with login credentials after payment',
+        language === 'SQ'
+          ? 'Hyni në llogarinë për të rezervuar seancat e ardhshme'
+          : language === 'MK'
+          ? 'Најавете се на вашата сметка за да резервирате идни сесии'
+          : 'Log in to your account to book future sessions',
+      ];
+    }
+    return [
+      t.step1 || 'Arrive 10 minutes early',
+      t.step2 || 'Bring a towel and water bottle',
+      t.step3 || 'Payment is due at the studio',
+    ];
+  };
+
+  const nextSteps = getNextSteps();
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4 pt-12 flex flex-col items-center justify-center">
@@ -35,45 +94,55 @@ export function SuccessScreen({ bookingData, onViewOther, onViewPackages, onBack
 
       {/* Success Message */}
       <h1 className="text-xl text-[#3d2f28] text-center mb-3">
-        {t.reservationConfirmed}
+        {getSuccessTitle()}
       </h1>
 
       <p className="text-sm text-[#6b5949] text-center mb-8 px-4">
-        {t.successMessage}
+        {getSuccessMessage()}
       </p>
 
       {/* Next Steps */}
       <div className="bg-white rounded-xl p-4 mb-6 shadow-sm w-full">
-        <h2 className="text-sm text-[#3d2f28] mb-3">{t.nextSteps}</h2>
+        <h2 className="text-sm text-[#3d2f28] mb-3">
+          {language === 'SQ' ? 'Hapat e Radhës' : language === 'MK' ? 'Следни Чекори' : 'Next Steps'}
+        </h2>
         <div className="space-y-2">
-          <div className="flex gap-2">
-            <span className="text-[#6b5949]">1.</span>
-            <p className="text-xs text-[#6b5949] flex-1">{t.step1}</p>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-[#6b5949]">2.</span>
-            <p className="text-xs text-[#6b5949] flex-1">{t.step2}</p>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-[#6b5949]">3.</span>
-            <p className="text-xs text-[#6b5949] flex-1">{t.step3}</p>
-          </div>
+          {nextSteps.map((step, index) => (
+            <div key={index} className="flex gap-2">
+              <span className="text-[#6b5949]">{index + 1}.</span>
+              <p className="text-xs text-[#6b5949] flex-1">{step}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Action Buttons */}
+      {/* Booking Details */}
+      {bookingData.dateKey && bookingData.timeSlot && (
+        <div className="bg-white rounded-xl p-4 mb-6 shadow-sm w-full">
+          <h2 className="text-sm text-[#3d2f28] mb-3">
+            {language === 'SQ' ? 'Detajet e Rezervimit' : language === 'MK' ? 'Детали за Резервацијата' : 'Booking Details'}
+          </h2>
+          <div className="space-y-1 text-xs text-[#6b5949]">
+            <p><strong>{language === 'SQ' ? 'Data:' : language === 'MK' ? 'Датум:' : 'Date:'}</strong> {bookingData.date}</p>
+            <p><strong>{language === 'SQ' ? 'Ora:' : language === 'MK' ? 'Време:' : 'Time:'}</strong> {bookingData.timeSlot}</p>
+            {isPackageBooking && (
+              <p>
+                <strong>{language === 'SQ' ? 'Paketa:' : language === 'MK' ? 'Пакет:' : 'Package:'}</strong>{' '}
+                {bookingData.selectedPackage === 'package8' ? '8 ' : bookingData.selectedPackage === 'package10' ? '10 ' : '12 '}
+                {language === 'SQ' ? 'klase' : language === 'MK' ? 'часови' : 'classes'}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Action Button */}
       <div className="space-y-2 w-full">
         <button
-          onClick={onViewOther}
+          onClick={onBack}
           className="w-full bg-[#9ca571] text-white py-3 rounded-lg text-sm hover:bg-[#8a9463] transition-colors"
         >
-          {t.viewOther}
-        </button>
-        <button
-          onClick={onViewPackages}
-          className="w-full bg-white text-[#6b5949] py-3 rounded-lg text-sm hover:bg-[#f5f0ed] transition-colors border border-[#e8dfd8]"
-        >
-          {t.viewPackages}
+          {language === 'SQ' ? 'Kthehu në Fillim' : language === 'MK' ? 'Назад на Почеток' : 'Back to Home'}
         </button>
       </div>
 
