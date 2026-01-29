@@ -323,7 +323,7 @@ export function MainApp() {
         <ConfirmationScreen
           bookingData={screen.bookingData}
           onBack={handleBack}
-          onConfirm={handleConfirmBooking}
+          onConfirm={() => handleConfirmBooking(screen.bookingData)}
           onPaymentToggle={(value) => {
             setScreen({
               type: 'confirmation',

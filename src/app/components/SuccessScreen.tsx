@@ -1,4 +1,4 @@
-import { CheckCircle2, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { BookingData } from '../App';
 import { Language, translations } from '../translations';
 import { logo } from '../../assets/images';
@@ -85,11 +85,9 @@ export function SuccessScreen({ bookingData, onViewOther, onViewPackages, onBack
         </button>
       </div>
 
-      {/* Success Icon */}
+      {/* Logo */}
       <div className="flex justify-center mb-6">
-        <div className="w-20 h-20 bg-[#e8dfd8] rounded-full flex items-center justify-center">
-          <CheckCircle2 className="w-12 h-12 text-[#6b5949]" strokeWidth={2.5} />
-        </div>
+        <img src={logo} alt="Logo" className="w-20 h-20 object-contain" />
       </div>
 
       {/* Success Message */}
@@ -146,9 +144,8 @@ export function SuccessScreen({ bookingData, onViewOther, onViewPackages, onBack
         </button>
       </div>
 
-      {/* Logo */}
+      {/* Footer */}
       <div className="text-center mt-8 mb-4">
-        <img src={logo} alt="Logo" className="w-12 h-12 mx-auto mb-2" />
         <p className="text-xs text-[#8b7764]">{t.location}</p>
         <p className="text-xs text-[#8b7764] mt-1">{t.copyright}</p>
       </div>
