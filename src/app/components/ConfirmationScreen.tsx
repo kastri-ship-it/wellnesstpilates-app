@@ -202,7 +202,6 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
             }`}
           />
         </div>
-        <div>
       </div>
 
       {/* Payment Option */}
