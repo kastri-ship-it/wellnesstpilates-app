@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 
+// Email templates updated: 2026-01-29 - Logo URL and no emojis
 // Supabase client for direct table queries
 const getSupabase = () => createClient(
   Deno.env.get("SUPABASE_URL")!,
