@@ -92,7 +92,7 @@ function getAlbanianEmail(greeting, name, code) {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 4px 0 28px 0;">
-                    <a href="https://wellnestpilates.com/packages?code=${code}" style="display: inline-block; background-color: #6b7c5e; color: #ffffff; text-decoration: none; padding: 14px 48px; border-radius: 12px; font-size: 15px; font-weight: 600; line-height: 1;">
+                    <a href="https://app.wellnestpilates.com/packages?code=${code}" style="display: inline-block; background-color: #6b7c5e; color: #ffffff; text-decoration: none; padding: 14px 48px; border-radius: 12px; font-size: 15px; font-weight: 600; line-height: 1;">
                       Zgjidh paketen
                     </a>
                   </td>
@@ -221,7 +221,7 @@ function getMacedonianEmail(greeting, name, code) {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 4px 0 28px 0;">
-                    <a href="https://wellnestpilates.com/packages?code=${code}" style="display: inline-block; background-color: #6b7c5e; color: #ffffff; text-decoration: none; padding: 14px 48px; border-radius: 12px; font-size: 15px; font-weight: 600; line-height: 1;">
+                    <a href="https://app.wellnestpilates.com/packages?code=${code}" style="display: inline-block; background-color: #6b7c5e; color: #ffffff; text-decoration: none; padding: 14px 48px; border-radius: 12px; font-size: 15px; font-weight: 600; line-height: 1;">
                       Izberi paket
                     </a>
                   </td>

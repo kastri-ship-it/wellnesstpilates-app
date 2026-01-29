@@ -1057,7 +1057,7 @@ async function sendActivationCredentialsEmail(email: string, name: string, tempo
     <table width="100%" cellpadding="0" cellspacing="0" style="margin: 25px 0;">
       <tr>
         <td style="text-align: center;">
-          <a href="https://wellnestpilates.com/#/login" style="display: inline-block; background-color: #9ca571; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-family: Georgia, 'Times New Roman', serif;">
+          <a href="https://app.wellnestpilates.com/#/login" style="display: inline-block; background-color: #9ca571; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-family: Georgia, 'Times New Roman', serif;">
             ${loginButton}
           </a>
         </td>
