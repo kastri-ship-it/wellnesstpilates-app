@@ -1904,14 +1904,18 @@ app.patch("/make-server-b87b0c07/reservations/:id/status", async (c) => {
       if (reservationStatus === 'cancelled') {
         reservation.cancelledAt = new Date().toISOString();
         reservation.cancelReason = cancelReason || 'User cancelled';
-        
+
         const sessionTime = new Date(reservation.fullDate);
         const now = new Date();
         const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-        
+
         if (hoursUntilSession < 24) {
           reservation.lateCancellation = true;
         }
+      }
+
+      if (reservationStatus === 'no_show') {
+        reservation.noShowAt = new Date().toISOString();
       }
     }
 

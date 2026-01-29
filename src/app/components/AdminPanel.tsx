@@ -5,7 +5,7 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { DevTools } from './DevTools';
 import { BulkWaitlistUpload } from './BulkWaitlistUpload';
 
-export type UserStatus = 'pending' | 'confirmed' | 'cancelled';
+export type UserStatus = 'pending' | 'confirmed' | 'cancelled' | 'no_show';
 
 export type User = {
   id: string;
@@ -391,29 +391,69 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     return bookings.length;
   };
 
-  const getStatusColor = (status: UserStatus) => {
+  const getStatusColor = (status: UserStatus | string) => {
     switch (status) {
       case 'confirmed':
+      case 'attended':
         return 'bg-green-100 text-green-700';
       case 'pending':
         return 'bg-yellow-100 text-yellow-700';
       case 'cancelled':
         return 'bg-red-100 text-red-700';
+      case 'no_show':
+        return 'bg-orange-100 text-orange-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const getStatusText = (status: UserStatus) => {
+  const getStatusText = (status: UserStatus | string) => {
     switch (status) {
       case 'confirmed':
-        return 'Payed';
+      case 'attended':
+        return 'Paid';
       case 'pending':
         return 'Pending';
       case 'cancelled':
         return 'Cancelled';
+      case 'no_show':
+        return 'No Show';
       default:
         return status;
+    }
+  };
+
+  const handleBookingStatusChange = async (bookingId: string, newStatus: 'confirmed' | 'no_show') => {
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/reservations/${encodeURIComponent(bookingId)}/status`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({
+            reservationStatus: newStatus,
+            paymentStatus: newStatus === 'confirmed' ? 'paid' : 'unpaid'
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to update booking status:', data);
+        alert(data.error || 'Failed to update status');
+        return;
+      }
+
+      console.log('Booking status updated:', data);
+      // Refresh data
+      fetchBookings();
+    } catch (error) {
+      console.error('Error updating booking status:', error);
+      alert('Network error. Please try again.');
     }
   };
 
@@ -843,30 +883,61 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                         {/* Show bookings when slot is selected */}
                         {isSelected && bookingsCount > 0 && (
                           <div className="mt-2 ml-4 space-y-2">
-                            {getBookingsForTimeSlot(selectedDate, timeSlot.time).map((booking) => (
+                            {getBookingsForTimeSlot(selectedDate, timeSlot.time).map((booking: any) => (
                               <div
                                 key={booking.id}
-                                className="flex items-center justify-between p-3 bg-white border-2 border-[#e8dfd8] rounded-xl shadow-sm"
+                                className="p-3 bg-white border-2 border-[#e8dfd8] rounded-xl shadow-sm"
                               >
-                                <div>
-                                  <p className="text-sm text-[#3d2f28] font-medium">{booking.name} {booking.surname}</p>
-                                  <p className="text-xs text-[#8b7764] mt-0.5">
-                                    {booking.selectedPackage === 'package8'
-                                      ? '8 Sessions Package'
-                                      : booking.selectedPackage === 'package10'
-                                      ? '10 Sessions Package'
-                                      : booking.selectedPackage === 'package12'
-                                      ? '12 Sessions Package'
-                                      : 'Single Session'}
-                                  </p>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <p className="text-sm text-[#3d2f28] font-medium">{booking.name} {booking.surname}</p>
+                                    <p className="text-xs text-[#8b7764] mt-0.5">
+                                      {booking.serviceType === 'package' || booking.selectedPackage
+                                        ? booking.selectedPackage === 'package8' || booking.serviceType === 'package'
+                                          ? '8 Sessions Package'
+                                          : booking.selectedPackage === 'package10'
+                                          ? '10 Sessions Package'
+                                          : booking.selectedPackage === 'package12'
+                                          ? '12 Sessions Package'
+                                          : 'Package'
+                                        : 'Single Session'}
+                                    </p>
+                                  </div>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
+                                      booking.reservationStatus || booking.status
+                                    )}`}
+                                  >
+                                    {getStatusText(booking.reservationStatus || booking.status)}
+                                  </span>
                                 </div>
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
-                                    booking.status
-                                  )}`}
-                                >
-                                  {getStatusText(booking.status)}
-                                </span>
+                                {/* Action Buttons */}
+                                <div className="flex gap-2 pt-2 border-t border-[#e8dfd8]">
+                                  <button
+                                    onClick={() => handleBookingStatusChange(booking.id, 'confirmed')}
+                                    disabled={(booking.reservationStatus || booking.status) === 'confirmed' || (booking.reservationStatus || booking.status) === 'attended'}
+                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                      (booking.reservationStatus || booking.status) === 'confirmed' || (booking.reservationStatus || booking.status) === 'attended'
+                                        ? 'bg-green-100 text-green-700 cursor-default'
+                                        : 'bg-green-500 text-white hover:bg-green-600'
+                                    }`}
+                                  >
+                                    <CheckCircle className="w-3 h-3 inline mr-1" />
+                                    {(booking.reservationStatus || booking.status) === 'confirmed' || (booking.reservationStatus || booking.status) === 'attended' ? 'Paid' : 'Mark Paid'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleBookingStatusChange(booking.id, 'no_show')}
+                                    disabled={(booking.reservationStatus || booking.status) === 'no_show'}
+                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                      (booking.reservationStatus || booking.status) === 'no_show'
+                                        ? 'bg-orange-100 text-orange-700 cursor-default'
+                                        : 'bg-orange-500 text-white hover:bg-orange-600'
+                                    }`}
+                                  >
+                                    <Ban className="w-3 h-3 inline mr-1" />
+                                    {(booking.reservationStatus || booking.status) === 'no_show' ? 'No Show' : 'No Show'}
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
