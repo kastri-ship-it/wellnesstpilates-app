@@ -3424,12 +3424,12 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
       // Translations
       const translations = {
         sq: {
-          subject: '🎉 Mirë se vini në WellNest Pilates - Sesioni juaj falas ju pret!',
+          subject: 'Mirë se vini në WellNest Pilates - Sesioni juaj falas ju pret!',
           welcome: 'Mirë se vini në WellNest Pilates!',
           greeting: 'Përshëndetje',
-          intro: 'Jemi të entuziazmuar që t\'ju mirëpresim në familjen WellNest Pilates! 🧘‍♀️',
+          intro: 'Jemi të entuziazmuar që t\'ju mirëpresim në familjen WellNest Pilates!',
           offerText: 'Si dhuratë mirëseardhje të veçantë, ju ofrojmë:',
-          offerTitle: '🎁 Ofertë ekskluzive:',
+          offerTitle: 'Ofertë ekskluzive:',
           offerDesc: 'Blini një paketë me 8 klasë dhe merrni <strong>klasën e parë FALAS!</strong>',
           redeemTitle: 'Kështu e shfrytëzoni:',
           redeemSteps: [
@@ -3447,18 +3447,18 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
             'Udhëzim ekspert nga instruktorë të çertifikuar',
             'Grup i vogël për vëmendje të personalizuar'
           ],
-          locationTitle: '📍 Vendndodhja e Studios:',
+          locationTitle: 'Vendndodhja e Studios:',
           closing: 'Nuk mund të presim të ju shohim! Nëse keni ndonjë pyetje, mos hezitoni të na kontaktoni.',
           regards: 'Me respekt,',
           team: 'Ekipi i WellNest Pilates'
         },
         mk: {
-          subject: '🎉 Добредојдовте во WellNest Pilates - Вашата бесплатна сесија ве чека!',
+          subject: 'Добредојдовте во WellNest Pilates - Вашата бесплатна сесија ве чека!',
           welcome: 'Добредојдовте во WellNest Pilates!',
           greeting: 'Здраво',
-          intro: 'Воодушевени сме да ве поздравиме во семејството WellNest Pilates! 🧘‍♀️',
+          intro: 'Воодушевени сме да ве поздравиме во семејството WellNest Pilates!',
           offerText: 'Како посебен подарок за добредојде, ви нудиме:',
-          offerTitle: '🎁 Ексклузивна понуда:',
+          offerTitle: 'Ексклузивна понуда:',
           offerDesc: 'Купете пакет од 8 класи и добијте ја <strong>првата класа БЕСПЛАТНО!</strong>',
           redeemTitle: 'Како да искористите:',
           redeemSteps: [
@@ -3476,18 +3476,18 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
             'Експертски инструкции од сертифицирани инструктори',
             'Мала група за персонализирано внимание'
           ],
-          locationTitle: '📍 Локација на студиото:',
+          locationTitle: 'Локација на студиото:',
           closing: 'Нетрпеливо чекаме да ве видиме! Ако имате прашања, слободно контактирајте не.',
           regards: 'Со почит,',
           team: 'Тимот на WellNest Pilates'
         },
         en: {
-          subject: '🎉 Welcome to WellNest Pilates - Your Free Session Awaits!',
+          subject: 'Welcome to WellNest Pilates - Your Free Session Awaits!',
           welcome: 'Welcome to WellNest Pilates!',
           greeting: 'Hi',
-          intro: 'We\'re thrilled to welcome you to the WellNest Pilates family! 🧘‍♀️',
+          intro: 'We\'re thrilled to welcome you to the WellNest Pilates family!',
           offerText: 'As a special welcome gift, we\'re offering you:',
-          offerTitle: '🎁 Exclusive Offer:',
+          offerTitle: 'Exclusive Offer:',
           offerDesc: 'Purchase an 8-class package and get your <strong>first session FREE!</strong>',
           redeemTitle: 'Here\'s how to redeem:',
           redeemSteps: [
@@ -3505,7 +3505,7 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
             'Expert instruction from certified instructors',
             'Small group setting for personalized attention'
           ],
-          locationTitle: '📍 Studio Location:',
+          locationTitle: 'Studio Location:',
           closing: 'We can\'t wait to see you on the mat! If you have any questions, feel free to reach out.',
           regards: 'Best regards,',
           team: 'The WellNest Pilates Team'
@@ -3538,10 +3538,10 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
               overflow: hidden;
               box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             }
-            .header { 
-              background: linear-gradient(135deg, #9ca571 0%, #8a9463 100%); 
-              color: white; 
-              padding: 24px 32px; 
+            .header {
+              background-color: #452F21;
+              color: white;
+              padding: 30px;
               text-align: center;
             }
             .logo {
@@ -3647,8 +3647,8 @@ app.post("/make-server-b87b0c07/admin/waitlist/send-invite", async (c) => {
         <body>
           <div class="container">
             <div class="header">
-              <img src="https://raw.githubusercontent.com/yourusername/yourrepo/main/wellnest-logo.png" alt="WellNest Pilates" class="logo" />
-              <h1>🎉 ${t.welcome}</h1>
+              <img src="https://i.ibb.co/tT95h4s2/unnamed.png" alt="WellNest Pilates" class="logo" />
+              <h1>${t.welcome}</h1>
             </div>
             
             <div class="content">
