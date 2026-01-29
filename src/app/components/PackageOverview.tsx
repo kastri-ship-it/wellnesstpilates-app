@@ -61,38 +61,7 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [isBookingFirstSession, setIsBookingFirstSession] = useState(false);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-// Send confirmation email
-const sendConfirmationEmail = async (emailData: {
-  to: string;
-  customerName: string;
-  packageType: string;
-  packagePrice: string;
-  bookingDate: string;
-  bookingTime: string;
-  bonusClasses?: number;
-}) => {
-  try {
-    const response = await fetch(
-      `https://${projectId}.supabase.co/functions/v1/send-confirmation-email`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`,
-        },
-        body: JSON.stringify({
-          ...emailData,
-          language: language,
-          bonusClasses: emailData.bonusClasses || 0,
-        }),
-      }
-    );
-    const data = await response.json();
-    console.log('📧 Confirmation email sent:', data, 'bonusClasses:', emailData.bonusClasses);
-  } catch (error) {
-    console.error('❌ Failed to send confirmation email:', error);
-  }
-};
+
   const packages = [
     {
       type: 'package8' as const,
@@ -413,28 +382,14 @@ const sendConfirmationEmail = async (emailData: {
 
 console.log('✅ Package & first session booked successfully!');
 
-      // Send confirmation email
-      const packagePrices: Record<string, string> = {
-        'package8': '3500',
-        'package10': '4200', 
-        'package12': '4800',
-      };
-      await sendConfirmationEmail({
-        to: formData.email,
-        customerName: `${formData.name} ${formData.surname}`,
-        packageType: packageData.packageType.replace('package', ''),
-        packagePrice: packagePrices[packageData.packageType] || '0',
-        bookingDate: dateKey,
-        bookingTime: timeSlot,
-        bonusClasses: packageData.bonusClasses || 0,
-      });
-      
-      // Check if this is preview mode
+      // Email is sent by the server in the /first-session endpoint
+      // No need to send duplicate email from frontend
 
+      // Check if this is preview mode
       if (data.isPreviewMode && data.previewRegistrationLink) {
         console.log('🔧 PREVIEW MODE: Registration link:', data.previewRegistrationLink);
       } else {
-        console.log('📧 Registration email sent to:', formData.email);
+        console.log('📧 Registration email sent by server to:', formData.email);
       }
       
       console.log('🎟️ Activation code (admin will send later):', data.package?.activationCodeId);
