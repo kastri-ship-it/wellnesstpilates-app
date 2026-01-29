@@ -162,8 +162,38 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
 
     setIsSubmitting(true);
 
+    // Auto-validate coupon if entered but not validated
+    let validatedCouponCode: string | undefined = undefined;
+    if (couponCode.trim() && couponValidation.status !== 'valid') {
+      console.log('🔍 Auto-validating coupon before submit...');
+      try {
+        const validateResponse = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/validate-coupon`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${publicAnonKey}`,
+            },
+            body: JSON.stringify({ code: couponCode.trim() }),
+          }
+        );
+        const validateData = await validateResponse.json();
+        if (validateData.valid) {
+          validatedCouponCode = couponCode.trim();
+          console.log('✅ Coupon auto-validated successfully');
+        } else {
+          console.log('❌ Coupon invalid, proceeding without it');
+        }
+      } catch (error) {
+        console.log('⚠️ Coupon validation failed, proceeding without it');
+      }
+    } else if (couponValidation.status === 'valid') {
+      validatedCouponCode = couponCode.trim();
+    }
+
     try {
-      console.log('🎯 Step 1/2: Creating package...');
+      console.log('🎯 Step 1/2: Creating package...', validatedCouponCode ? `with coupon: ${validatedCouponCode}` : 'without coupon');
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/packages`,
         {
@@ -180,7 +210,7 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
             mobile: formData.mobile,
             email: formData.email,
             language: language,
-            couponCode: couponValidation.status === 'valid' ? couponCode.trim() : undefined,
+            couponCode: validatedCouponCode,
           }),
         }
       );
