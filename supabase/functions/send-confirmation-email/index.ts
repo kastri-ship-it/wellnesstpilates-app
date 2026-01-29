@@ -230,6 +230,7 @@ serve(async (req) => {
     const responseText = await res.text();
     console.log("Resend response:", responseText);
 
+   
     let data;
     try {
       data = JSON.parse(responseText);
