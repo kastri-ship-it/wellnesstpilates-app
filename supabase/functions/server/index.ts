@@ -236,10 +236,10 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 
 async function calculateSlotCapacity(dateKey: string, timeSlot: string): Promise<{available: number, isBlocked: boolean, isPrivate: boolean}> {
   const allReservations = await kv.getByPrefix('reservation:');
-  const slotReservations = allReservations.filter((r: any) => 
-    r.dateKey === dateKey && 
-    r.timeSlot === timeSlot && 
-    (r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
+  const slotReservations = allReservations.filter((r: any) =>
+    r.dateKey === dateKey &&
+    r.timeSlot === timeSlot &&
+    (r.reservationStatus === 'pending' || r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
   );
 
   const hasPrivateSession = slotReservations.some((r: any) => r.isPrivateSession);
@@ -2806,9 +2806,9 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
     const dateReservations = allReservations.filter((r: any) => r.dateKey === dateKey);
     
     const calendarData = await Promise.all(TIME_SLOTS.map(async (timeSlot) => {
-      const slotReservations = dateReservations.filter((r: any) => 
+      const slotReservations = dateReservations.filter((r: any) =>
         r.timeSlot === timeSlot &&
-        (r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
+        (r.reservationStatus === 'pending' || r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
       );
       
       const capacity = await calculateSlotCapacity(dateKey, timeSlot);
