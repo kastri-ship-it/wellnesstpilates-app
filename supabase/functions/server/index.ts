@@ -2168,16 +2168,27 @@ app.get("/make-server-b87b0c07/bookings", async (c) => {
 });
 
 app.post("/make-server-b87b0c07/bookings", async (c) => {
+  console.log('🎯 POST /bookings hit!');
   try {
-    const body = await c.req.json();
-    console.log('📥 Booking request body:', JSON.stringify(body));
+    const rawText = await c.req.text();
+    console.log('📥 Raw body text:', rawText);
+
+    let body;
+    try {
+      body = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.log('❌ JSON parse failed:', parseErr);
+      return c.json({ error: "Invalid JSON body", rawReceived: rawText.substring(0, 100) }, 400);
+    }
+
+    console.log('📥 Parsed body:', JSON.stringify(body));
     const { dateKey, timeSlot, instructor, name, surname, email, mobile, language, selectedPackage } = body;
 
     console.log('📋 Extracted fields:', { dateKey, timeSlot, instructor, name, surname, email, mobile });
 
     if (!dateKey || !timeSlot || !instructor || !name || !surname || !email || !mobile) {
       console.log('❌ Missing fields check failed:', { dateKey: !!dateKey, timeSlot: !!timeSlot, instructor: !!instructor, name: !!name, surname: !!surname, email: !!email, mobile: !!mobile });
-      return c.json({ error: "Missing required fields" }, 400);
+      return c.json({ error: "Missing required fields", receivedFields: Object.keys(body) }, 400);
     }
 
     const normalizedEmail = normalizeEmail(email);

@@ -67,8 +67,8 @@ serve(async (req) => {
           
           <!-- Header with Logo -->
           <tr>
-            <td style="background:#452F21;padding:50px 40px;text-align:center;">
-              <img src="https://i.ibb.co/tT95h4s2/unnamed.png" alt="WellNest Pilates" style="height:90px;width:auto;">
+            <td style="background:#3E2B22;padding:50px 40px;text-align:center;">
+              <img src="https://i.ibb.co/tT95h4s2/unnamed.png" alt="WellNest Pilates" style="max-width:100%;height:auto;display:block;margin:0 auto;">
             </td>
           </tr>
           
