@@ -12,9 +12,10 @@ type ConfirmationScreenProps = {
   onPaymentToggle: (value: boolean) => void;
   onUpdateBookingData: (data: Partial<BookingData>) => void;
   language: Language;
+  onBookingComplete?: () => void;
 };
 
-export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentToggle, onUpdateBookingData, language }: ConfirmationScreenProps) {
+export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentToggle, onUpdateBookingData, language, onBookingComplete }: ConfirmationScreenProps) {
   const t = translations[language];
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,6 +88,10 @@ export function ConfirmationScreen({ bookingData, onConfirm, onBack, onPaymentTo
       // Just show success message
       console.log('✅ Booking confirmed - user will receive credentials after admin activation');
 
+      // Trigger refresh of booking data before navigating away
+      if (onBookingComplete) {
+        onBookingComplete();
+      }
       onConfirm();
     } catch (error) {
       console.error('Error creating booking:', error);

@@ -7,6 +7,294 @@ const getSupabase = () => createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+// ============ SUPABASE USER TABLE FUNCTIONS ============
+
+// Ensure users table exists (creates if not exists)
+async function ensureUsersTable() {
+  const supabase = getSupabase();
+
+  // Try to query the table - if it fails, create it
+  const { error } = await supabase.from('users').select('id').limit(1);
+
+  if (error && error.code === '42P01') { // Table doesn't exist
+    console.log('Creating users table...');
+    const { error: createError } = await supabase.rpc('exec_sql', {
+      sql: `
+        CREATE TABLE IF NOT EXISTS users (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email TEXT UNIQUE NOT NULL,
+          name TEXT NOT NULL,
+          surname TEXT NOT NULL,
+          mobile TEXT,
+          password_hash TEXT,
+          verified BOOLEAN DEFAULT FALSE,
+          blocked BOOLEAN DEFAULT FALSE,
+          package_type TEXT,
+          total_sessions INTEGER DEFAULT 0,
+          used_sessions INTEGER DEFAULT 0,
+          remaining_sessions INTEGER DEFAULT 0,
+          gifted_sessions INTEGER DEFAULT 0,
+          payment_status TEXT DEFAULT 'unpaid',
+          activation_code TEXT,
+          activation_status TEXT DEFAULT 'pending',
+          activated_at TIMESTAMPTZ,
+          package_expiry_date TIMESTAMPTZ,
+          language TEXT DEFAULT 'EN',
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      `
+    });
+    if (createError) {
+      console.error('Failed to create users table:', createError);
+    }
+  }
+}
+
+// Save or update user in Supabase
+async function saveUserToSupabase(userData: {
+  email: string;
+  name: string;
+  surname: string;
+  mobile?: string;
+  package_type?: string;
+  total_sessions?: number;
+  remaining_sessions?: number;
+  used_sessions?: number;
+  payment_status?: string;
+  language?: string;
+}) {
+  const supabase = getSupabase();
+
+  // Check if user exists
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', userData.email.toLowerCase())
+    .maybeSingle();
+
+  if (existingUser) {
+    // Update existing user
+    const updateData: Record<string, any> = {
+      name: userData.name,
+      surname: userData.surname,
+      mobile: userData.mobile,
+      package_type: userData.package_type,
+      total_sessions: userData.total_sessions,
+      payment_status: userData.payment_status,
+      language: userData.language,
+      updated_at: new Date().toISOString()
+    };
+    if (userData.remaining_sessions !== undefined) {
+      updateData.remaining_sessions = userData.remaining_sessions;
+    }
+    if (userData.used_sessions !== undefined) {
+      updateData.used_sessions = userData.used_sessions;
+    }
+    const { data, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('email', userData.email.toLowerCase())
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating user in Supabase:', error);
+      return null;
+    }
+    console.log(`User updated in Supabase: ${userData.email}`);
+    return data;
+  } else {
+    // Insert new user
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        email: userData.email.toLowerCase(),
+        name: userData.name,
+        surname: userData.surname,
+        mobile: userData.mobile,
+        package_type: userData.package_type,
+        total_sessions: userData.total_sessions || 0,
+        remaining_sessions: userData.remaining_sessions ?? (userData.total_sessions || 0),
+        used_sessions: userData.used_sessions || 0,
+        payment_status: userData.payment_status || 'unpaid',
+        language: userData.language || 'EN'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting user in Supabase:', error);
+      return null;
+    }
+    console.log(`User created in Supabase: ${userData.email}`);
+    return data;
+  }
+}
+
+// Update reservation status in Supabase
+async function updateReservationStatusInSupabase(reservationId: string, status: string, paymentStatus: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('reservations')
+    .update({
+      reservation_status: status,
+      payment_status: paymentStatus,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', reservationId);
+
+  if (error) {
+    console.error('Error updating reservation status in Supabase:', error);
+  } else {
+    console.log(`Reservation ${reservationId} status updated to ${status}/${paymentStatus}`);
+  }
+}
+
+// Save reservation to Supabase
+async function saveReservationToSupabase(reservationData: {
+  user_email: string;
+  date_key: string;
+  time_slot: string;
+  end_time?: string;
+  instructor?: string;
+  service_type?: string;
+  package_type?: string;
+  reservation_status?: string;
+  payment_status?: string;
+  name: string;
+  surname: string;
+  mobile?: string;
+}) {
+  const supabase = getSupabase();
+
+  // Get user_id from users table
+  const { data: user } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', reservationData.user_email.toLowerCase())
+    .maybeSingle();
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .insert({
+      user_id: user?.id || null,
+      user_email: reservationData.user_email.toLowerCase(),
+      date_key: reservationData.date_key,
+      time_slot: reservationData.time_slot,
+      end_time: reservationData.end_time,
+      instructor: reservationData.instructor || 'Rina',
+      service_type: reservationData.service_type || 'single',
+      package_type: reservationData.package_type,
+      reservation_status: reservationData.reservation_status || 'pending',
+      payment_status: reservationData.payment_status || 'unpaid',
+      name: reservationData.name,
+      surname: reservationData.surname,
+      mobile: reservationData.mobile
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error inserting reservation in Supabase:', error);
+    return null;
+  }
+  console.log(`Reservation created in Supabase for: ${reservationData.user_email}`);
+  return data;
+}
+
+// Save user booking to the new user_bookings table
+async function saveUserBookingToSupabase(bookingData: {
+  user_email: string;
+  user_name: string;
+  user_surname: string;
+  date_key: string;
+  time_slot: string;
+}) {
+  const supabase = getSupabase();
+
+  // Parse date_key to get actual date (format: "1-29" for Jan 29)
+  const [month, day] = bookingData.date_key.split('-').map(Number);
+  const year = new Date().getFullYear();
+  const bookingDate = new Date(year, month - 1, day);
+
+  const { data, error } = await supabase
+    .from('user_bookings')
+    .insert({
+      user_email: bookingData.user_email.toLowerCase(),
+      user_name: bookingData.user_name,
+      user_surname: bookingData.user_surname,
+      date_key: bookingData.date_key,
+      time_slot: bookingData.time_slot,
+      booking_date: bookingDate.toISOString().split('T')[0],
+      status: 'pending'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error inserting user booking in Supabase:', error);
+    return null;
+  }
+  console.log(`User booking saved to user_bookings for: ${bookingData.user_email}`);
+  return data;
+}
+
+// Get all user bookings from Supabase
+async function getUserBookingsFromSupabase() {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('user_bookings')
+    .select('*')
+    .order('booking_date', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching user bookings from Supabase:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Get all users from Supabase
+async function getUsersFromSupabase() {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching users from Supabase:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Get reservations from Supabase
+async function getReservationsFromSupabase(dateKey?: string) {
+  const supabase = getSupabase();
+
+  let query = supabase
+    .from('reservations')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (dateKey) {
+    query = query.eq('date_key', dateKey);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching reservations from Supabase:', error);
+    return [];
+  }
+  return data || [];
+}
+
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
@@ -1285,10 +1573,8 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
       }
     }
 
-    const activationCode = generateActivationCode();
-    const codeKey = `activation_code:${activationCode}`;
-    const codeExpiry = new Date();
-    codeExpiry.setHours(codeExpiry.getHours() + 24);
+    // Simplified flow: No activation code generation
+    // Credentials will be generated when admin clicks "Activate Package"
 
     let paymentStatus: PaymentStatus = 'unpaid';
     let paymentId: string | null = null;
@@ -1324,7 +1610,7 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
       paymentStatus,
       firstReservationId: null,
       paymentId,
-      activationCodeId: codeKey,
+      activationCodeId: null, // No longer using activation codes
       name,
       surname,
       mobile,
@@ -1335,31 +1621,30 @@ app.post("/make-server-b87b0c07/packages", async (c) => {
     };
 
     await kv.set(packageId, pkg);
+    console.log(`Package created: ${packageId}`);
 
-    const activationCodeData = {
-      id: codeKey,
-      code: activationCode,
+    // *** SAVE USER TO SUPABASE ***
+    // Save user to Supabase when package is created (before first session is booked)
+    await saveUserToSupabase({
       email: normalizedEmail,
-      packageId,
-      reservationId: null,
-      status: 'active',
-      expiresAt: codeExpiry.toISOString(),
-      usedAt: null,
-      createdAt: new Date().toISOString()
-    };
-
-    await kv.set(codeKey, activationCodeData);
-    console.log(`Package created: ${packageId}, activation code: ${activationCode}`);
+      name,
+      surname,
+      mobile,
+      package_type: packageType,
+      total_sessions: totalSessions,
+      payment_status: paymentStatus,
+      language: language || 'EN'
+    });
+    console.log(`✅ User saved to Supabase on package creation: ${normalizedEmail}`);
 
     return c.json({
       success: true,
       package: pkg,
       packageId,
-      activationCode,
       requiresFirstSessionBooking: true,
       bonusClasses,
       redeemedCoupon: redeemedCouponCode,
-      message: bonusClasses > 0 
+      message: bonusClasses > 0
         ? `Package created with +${bonusClasses} bonus class! Please select date and time for your first session.`
         : "Package created. Please select date and time for your first session."
     });
@@ -1460,57 +1745,59 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
 
     await kv.set(reservationId, reservation);
 
+    // Simplified flow: NO session decrement at booking time
+    // Sessions will be decremented when admin activates the package
     pkg.firstReservationId = reservationId;
     pkg.sessionsBooked = [reservationId];
+    // pkg.remainingSessions stays at pkg.totalSessions (no decrement yet)
     pkg.updatedAt = new Date().toISOString();
     await kv.set(packageId, pkg);
 
-    try {
-      const user = await kv.get(`user:${pkg.email}`);
-      
-      if (!user || !user.passwordHash) {
-        const verificationToken = `verify_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
-        const tokenKey = `verification_token:${verificationToken}`;
-        const tokenExpiry = new Date();
-        tokenExpiry.setHours(tokenExpiry.getHours() + 24);
+    // *** SAVE TO SUPABASE TABLES ***
+    // Save user to Supabase (source of truth for admin panel)
+    // Note: remaining_sessions = totalSessions (no decrement), used_sessions = 0
+    await saveUserToSupabase({
+      email: pkg.email,
+      name: pkg.name,
+      surname: pkg.surname,
+      mobile: pkg.mobile,
+      package_type: pkg.packageType,
+      total_sessions: pkg.totalSessions,
+      remaining_sessions: pkg.totalSessions, // NOT decremented yet
+      used_sessions: 0, // Session not used until activation
+      payment_status: pkg.paymentStatus || 'unpaid',
+      language: pkg.language || 'EN'
+    });
 
-        const tokenData = {
-          id: tokenKey,
-          token: verificationToken,
-          email: pkg.email,
-          expiresAt: tokenExpiry.toISOString(),
-          used: false,
-          createdAt: new Date().toISOString()
-        };
-        await kv.set(tokenKey, tokenData);
+    // Save reservation to Supabase
+    await saveReservationToSupabase({
+      user_email: pkg.email,
+      date_key: dateKey,
+      time_slot: timeSlot,
+      end_time: endTime,
+      instructor,
+      service_type: serviceType,
+      package_type: pkg.packageType,
+      reservation_status: 'pending',
+      payment_status: pkg.paymentStatus || 'unpaid',
+      name: pkg.name,
+      surname: pkg.surname,
+      mobile: pkg.mobile
+    });
 
-        if (user) {
-          user.verificationToken = verificationToken;
-          user.verified = false;
-          user.passwordHash = null;
-          user.updatedAt = new Date().toISOString();
-          await kv.set(`user:${pkg.email}`, user);
-        }
+    // Save to user_bookings table for admin panel tracking
+    await saveUserBookingToSupabase({
+      user_email: pkg.email,
+      user_name: pkg.name,
+      user_surname: pkg.surname,
+      date_key: dateKey,
+      time_slot: timeSlot
+    });
 
-        await sendRegistrationEmail(
-          pkg.email,
-          pkg.name,
-          pkg.surname,
-          verificationToken,
-          pkg.packageType,
-          dateString,
-          timeSlot,
-          endTime,
-          appUrl,
-          pkg.language,
-          pkg.bonusClasses || 0,
-          pkg.redeemedCouponCode || ''
-        );
-        console.log(`Registration email sent to: ${pkg.email} in language: ${pkg.language}`);
-      }
-    } catch (emailError) {
-      console.error('Error sending registration email:', emailError);
-    }
+    console.log(`✅ First session booked (pending activation): ${pkg.email}`);
+
+    // Simplified flow: NO registration email sent here
+    // Credentials email will be sent when admin activates the package
 
     console.log(`First session booked for package ${packageId}: ${reservationId}`);
 
@@ -1518,11 +1805,7 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
       success: true,
       package: pkg,
       reservation,
-      message: pkg.isPreviewMode 
-        ? "Booking successful! (Preview mode - registration link shown below)" 
-        : "Booking successful! Check your email to complete registration.",
-      isPreviewMode: pkg.isPreviewMode || false,
-      previewRegistrationLink: pkg.previewRegistrationLink || null
+      message: "Booking successful! Your account will be activated after payment at the studio."
     });
 
   } catch (error) {
@@ -1712,6 +1995,48 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       
       await kv.set(packageId, pkg);
       console.log(`Subsequent package session booked: ${reservationId} (session ${sessionNumber}/${pkg.totalSessions})`);
+
+      // *** SAVE TO SUPABASE FOR SUBSEQUENT SESSIONS ***
+      // Update user remaining sessions in Supabase
+      await saveUserToSupabase({
+        email: normalizedEmail,
+        name,
+        surname,
+        mobile,
+        package_type: pkg.packageType,
+        total_sessions: pkg.totalSessions,
+        remaining_sessions: pkg.remainingSessions,
+        used_sessions: pkg.sessionsBooked.length,
+        payment_status: pkg.paymentStatus || 'unpaid',
+        language: language || 'EN'
+      });
+
+      // Save reservation to Supabase
+      await saveReservationToSupabase({
+        user_email: normalizedEmail,
+        date_key: dateKey,
+        time_slot: timeSlot,
+        end_time: endTime,
+        instructor,
+        service_type: serviceType,
+        package_type: pkg.packageType,
+        reservation_status: 'confirmed',
+        payment_status: pkg.paymentStatus || 'unpaid',
+        name,
+        surname,
+        mobile
+      });
+
+      // Save to user_bookings table for admin panel tracking
+      await saveUserBookingToSupabase({
+        user_email: normalizedEmail,
+        user_name: name,
+        user_surname: surname,
+        date_key: dateKey,
+        time_slot: timeSlot
+      });
+
+      console.log(`✅ Subsequent session saved to Supabase: ${normalizedEmail}`);
 
       return c.json({
         success: true,
@@ -1956,7 +2281,54 @@ app.patch("/make-server-b87b0c07/reservations/:id/status", async (c) => {
     reservation.updatedAt = new Date().toISOString();
     await kv.set(reservationId, reservation);
 
-    console.log(`Reservation ${reservationId} status updated`);
+    // *** SYNC TO SUPABASE ***
+    const supabase = getSupabase();
+
+    // Update reservations table
+    if (reservationStatus || paymentStatus) {
+      const reservationUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString()
+      };
+      if (reservationStatus) reservationUpdate.reservation_status = reservationStatus;
+      if (paymentStatus) reservationUpdate.payment_status = paymentStatus;
+
+      await supabase
+        .from('reservations')
+        .update(reservationUpdate)
+        .eq('user_email', reservation.email || reservation.userId)
+        .eq('date_key', reservation.dateKey)
+        .eq('time_slot', reservation.timeSlot);
+    }
+
+    // Update user_bookings table status
+    if (reservationStatus) {
+      // Map reservation status to user_bookings status
+      let bookingStatus = reservationStatus;
+      if (reservationStatus === 'confirmed') bookingStatus = 'pending'; // Keep as pending until attended
+
+      await supabase
+        .from('user_bookings')
+        .update({
+          status: bookingStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_email', reservation.email || reservation.userId)
+        .eq('date_key', reservation.dateKey)
+        .eq('time_slot', reservation.timeSlot);
+    }
+
+    // Update user payment status if changed
+    if (paymentStatus) {
+      await supabase
+        .from('users')
+        .update({
+          payment_status: paymentStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('email', reservation.email || reservation.userId);
+    }
+
+    console.log(`✅ Reservation ${reservationId} status synced to Supabase`);
 
     return c.json({
       success: true,
@@ -2010,120 +2382,114 @@ app.delete("/make-server-b87b0c07/reservations/:id", async (c) => {
   }
 });
 
-// ============ ACTIVATION ENDPOINTS ============
+// ============ DEPRECATED ACTIVATION ENDPOINTS ============
+// These endpoints are deprecated and return 410 Gone
+// All activation now happens via admin/activate-package endpoint
 
 app.post("/make-server-b87b0c07/activate", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { email, activationCode } = body;
-
-    if (!email || !activationCode) {
-      return c.json({ error: "Email and activation code are required" }, 400);
-    }
-
-    const normalizedEmail = normalizeEmail(email);
-    const codeKey = `activation_code:${activationCode}`;
-    const activationData = await kv.get(codeKey);
-
-    if (!activationData) {
-      return c.json({ error: "Invalid activation code" }, 400);
-    }
-
-    if (activationData.email !== normalizedEmail) {
-      return c.json({ error: "Activation code does not match email" }, 400);
-    }
-
-    if (activationData.status !== 'active') {
-      return c.json({ error: "Activation code has already been used" }, 400);
-    }
-
-    if (new Date(activationData.expiresAt) < new Date()) {
-      return c.json({ error: "Activation code has expired" }, 400);
-    }
-
-    const packageId = activationData.packageId;
-    const reservationId = activationData.reservationId;
-    let activatedItem = null;
-    let itemType = '';
-
-    if (packageId) {
-      const pkg = await kv.get(packageId);
-      if (!pkg) {
-        return c.json({ error: "Package not found" }, 404);
-      }
-
-      pkg.activationDate = new Date().toISOString();
-      pkg.expiryDate = calculateExpiry(pkg.activationDate);
-      pkg.packageStatus = 'active';
-      pkg.activationStatus = 'activated';
-      pkg.updatedAt = new Date().toISOString();
-      await kv.set(packageId, pkg);
-
-      if (pkg.firstReservationId) {
-        const firstReservation = await kv.get(pkg.firstReservationId);
-        if (firstReservation) {
-          firstReservation.reservationStatus = 'confirmed';
-          firstReservation.activatedAt = new Date().toISOString();
-          firstReservation.updatedAt = new Date().toISOString();
-          await kv.set(pkg.firstReservationId, firstReservation);
-        }
-      }
-
-      activatedItem = pkg;
-      itemType = 'package';
-      console.log(`Package activated: ${packageId}`);
-
-    } else if (reservationId) {
-      const reservation = await kv.get(reservationId);
-      if (!reservation) {
-        return c.json({ error: "Reservation not found" }, 404);
-      }
-
-      reservation.reservationStatus = 'confirmed';
-      reservation.activatedAt = new Date().toISOString();
-      reservation.updatedAt = new Date().toISOString();
-      await kv.set(reservationId, reservation);
-
-      activatedItem = reservation;
-      itemType = 'reservation';
-      console.log(`Reservation activated: ${reservationId}`);
-    }
-
-    activationData.status = 'used';
-    activationData.usedAt = new Date().toISOString();
-    await kv.set(codeKey, activationData);
-
-    return c.json({
-      success: true,
-      message: `${itemType === 'package' ? 'Package' : 'Reservation'} activated successfully!`,
-      itemType,
-      item: activatedItem
-    });
-
-  } catch (error) {
-    console.error('Error activating:', error);
-    return c.json({ error: 'Activation failed', details: error.message }, 500);
-  }
+  console.warn('DEPRECATED: /activate endpoint called - this flow is no longer supported');
+  return c.json({
+    error: "This activation flow is no longer supported",
+    message: "Package activation is now handled by admin. Your account will be activated after payment at the studio.",
+    deprecated: true
+  }, 410);
 });
 
 // ============ ADMIN ENDPOINTS ============
 
 // Get all users with aggregated package and payment data
-app.get("/make-server-b87b0c07/admin/users", async (c) => {
+// Now reads from Supabase as the primary source of truth
+app.get("/make-server-b87b0c07/admin/users", async (c: any) => {
   try {
-    const allUsers = await kv.getByPrefix('user:');
+    // Check if Supabase tables are accessible
+    const supabase = getSupabase();
+    const { error: tableCheckError } = await supabase.from('users').select('id').limit(1);
+    const supabaseAvailable = !tableCheckError || tableCheckError.code !== '42P01';
+
+    // Try to get users from Supabase first (source of truth)
+    const supabaseUsers = supabaseAvailable ? await getUsersFromSupabase() : [];
+    const supabaseReservations = supabaseAvailable ? await getReservationsFromSupabase() : [];
+
+    // Also get KV data for additional info (packages, etc.)
     const allPackages = await kv.getByPrefix('package:');
-    const allReservations = await kv.getByPrefix('reservation:');
+    const kvReservations = await kv.getByPrefix('reservation:');
+
+    // If Supabase is available, use it as primary source (even if empty)
+    if (supabaseAvailable) {
+      const userSummaries = supabaseUsers.map((user: any) => {
+        const userEmail = user.email;
+
+        // Find all packages for this user from KV
+        const userPackages = allPackages.filter((pkg: any) => pkg.userId === userEmail);
+
+        // Find all reservations for this user from Supabase
+        const userReservations = supabaseReservations.filter((res: any) => res.user_email === userEmail);
+
+        // Calculate session info from user record
+        const totalSessions = user.total_sessions || 0;
+        const usedSessions = user.used_sessions || 0;
+        const remainingSessions = user.remaining_sessions || (totalSessions - usedSessions);
+
+        return {
+          id: user.id,
+          name: user.name,
+          surname: user.surname,
+          mobile: user.mobile,
+          email: user.email,
+          paymentStatus: user.payment_status || 'unpaid',
+          packages: userPackages.map((pkg: any) => ({
+            id: pkg.id,
+            type: pkg.packageType,
+            status: pkg.packageStatus,
+            paymentStatus: pkg.paymentStatus,
+            activationStatus: pkg.activationStatus,
+            sessionsUsed: pkg.sessionsUsed || 0,
+            createdAt: pkg.createdAt,
+            activationDate: pkg.activationDate,
+            expiryDate: pkg.expiryDate,
+          })),
+          reservations: userReservations.map((res: any) => ({
+            id: res.id,
+            dateKey: res.date_key,
+            timeSlot: res.time_slot,
+            reservationStatus: res.reservation_status,
+            paymentStatus: res.payment_status,
+            createdAt: res.created_at,
+          })),
+          totalSessions,
+          usedSessions,
+          remainingSessions,
+          createdAt: user.created_at,
+          blocked: user.blocked || false,
+          language: user.language || 'EN',
+          packageType: user.package_type,
+          expiryDate: user.package_expiry_date,
+        };
+      });
+
+      return c.json({
+        success: true,
+        users: userSummaries,
+        total: userSummaries.length,
+        paid: userSummaries.filter((u: any) => u.paymentStatus === 'paid').length,
+        unpaid: userSummaries.filter((u: any) => u.paymentStatus === 'unpaid').length,
+        source: 'supabase'
+      });
+    }
+
+    // Fallback: If Supabase is empty, read from KV store (legacy)
+    console.log('Supabase empty, falling back to KV store');
+    const allUsers = await kv.getByPrefix('user:');
 
     // Build user summary with packages and payment status
     const userSummaries = allUsers.map((user: any) => {
       const userEmail = user.email;
-      
+
       // Find all packages for this user
       const userPackages = allPackages.filter((pkg: any) => pkg.userId === userEmail);
-      
+
       // Find all reservations for this user
-      const userReservations = allReservations.filter((res: any) => res.userId === userEmail);
+      const userReservations = kvReservations.filter((res: any) => res.userId === userEmail);
 
       // Determine payment status (paid if any package/reservation has paid status)
       const hasPaidPackage = userPackages.some((pkg: any) => pkg.paymentStatus === 'paid');
@@ -2131,14 +2497,18 @@ app.get("/make-server-b87b0c07/admin/users", async (c) => {
       const paymentStatus = (hasPaidPackage || hasPaidReservation) ? 'paid' : 'unpaid';
 
       // Calculate total sessions across all packages
-      const totalSessions = userPackages.reduce((sum: number, pkg: any) => {
-        const sessionCount = parseInt(pkg.packageType.match(/\d+/)?.[0] || '0');
-        return sum + sessionCount;
+      const packageSessions = userPackages.reduce((sum: number, pkg: any) => {
+        return sum + (pkg.totalSessions || parseInt(pkg.packageType.match(/\d+/)?.[0] || '0'));
       }, 0);
+
+      // Count single session reservations (not linked to a package)
+      const singleSessionCount = userReservations.filter((res: any) => !res.packageId).length;
+
+      const totalSessions = packageSessions + singleSessionCount;
 
       const usedSessions = userPackages.reduce((sum: number, pkg: any) => {
         return sum + (pkg.sessionsUsed || 0);
-      }, 0);
+      }, 0) + singleSessionCount; // Single sessions are "used" when booked
 
       return {
         id: user.id,
@@ -2174,16 +2544,63 @@ app.get("/make-server-b87b0c07/admin/users", async (c) => {
       };
     });
 
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       users: userSummaries,
       total: userSummaries.length,
-      paid: userSummaries.filter(u => u.paymentStatus === 'paid').length,
-      unpaid: userSummaries.filter(u => u.paymentStatus === 'unpaid').length,
+      paid: userSummaries.filter((u: any) => u.paymentStatus === 'paid').length,
+      unpaid: userSummaries.filter((u: any) => u.paymentStatus === 'unpaid').length,
+      source: 'kv_fallback'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching admin users:', error);
     return c.json({ error: 'Failed to fetch users', details: error.message }, 500);
+  }
+});
+
+// Get all user bookings for admin panel
+app.get("/make-server-b87b0c07/admin/user-bookings", async (c: any) => {
+  try {
+    const userBookings = await getUserBookingsFromSupabase();
+
+    // Group bookings by user email
+    const bookingsByUser: Record<string, any[]> = {};
+    userBookings.forEach((booking: any) => {
+      const email = booking.user_email;
+      if (!bookingsByUser[email]) {
+        bookingsByUser[email] = [];
+      }
+      bookingsByUser[email].push({
+        id: booking.id,
+        dateKey: booking.date_key,
+        timeSlot: booking.time_slot,
+        bookingDate: booking.booking_date,
+        status: booking.status,
+        userName: booking.user_name,
+        userSurname: booking.user_surname,
+        createdAt: booking.created_at
+      });
+    });
+
+    return c.json({
+      success: true,
+      bookings: userBookings.map((b: any) => ({
+        id: b.id,
+        userEmail: b.user_email,
+        userName: b.user_name,
+        userSurname: b.user_surname,
+        dateKey: b.date_key,
+        timeSlot: b.time_slot,
+        bookingDate: b.booking_date,
+        status: b.status,
+        createdAt: b.created_at
+      })),
+      bookingsByUser,
+      total: userBookings.length
+    });
+  } catch (error: any) {
+    console.error('Error fetching user bookings:', error);
+    return c.json({ error: 'Failed to fetch user bookings', details: error.message }, 500);
   }
 });
 
@@ -2239,102 +2656,18 @@ app.patch("/make-server-b87b0c07/admin/users/:email/payment", async (c) => {
 });
 
 // Resend activation code email for a user
+// DEPRECATED: Activation codes are no longer used
 app.post("/make-server-b87b0c07/admin/resend-activation-code", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { email } = body;
-
-    if (!email) {
-      return c.json({ error: "Email is required" }, 400);
-    }
-
-    const normalizedEmail = normalizeEmail(email);
-    
-    // Find user's active activation codes
-    const allActivationCodes = await kv.getByPrefix('activation_code:');
-    const userActivationCodes = allActivationCodes.filter(
-      (code: any) => code.email === normalizedEmail && code.status === 'active'
-    );
-
-    if (userActivationCodes.length === 0) {
-      return c.json({ error: "No active activation codes found for this user" }, 404);
-    }
-
-    // Get the most recent activation code
-    const latestCode = userActivationCodes.sort(
-      (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )[0];
-
-    // Get the user info
-    const user = await kv.get(`user:${normalizedEmail}`);
-    if (!user) {
-      return c.json({ error: "User not found" }, 404);
-    }
-
-    // Determine what type of activation code it is
-    let packageType: PackageType = 'single';
-    let firstSessionDetails = null;
-
-    if (latestCode.packageId) {
-      const pkg = await kv.get(latestCode.packageId);
-      if (pkg) {
-        packageType = pkg.packageType;
-        
-        // If there's a first reservation, get those details
-        if (pkg.firstReservationId) {
-          const reservation = await kv.get(pkg.firstReservationId);
-          if (reservation) {
-            const [hours, minutes] = reservation.timeSlot.split(':');
-            const endTime = `${(parseInt(hours) + 1).toString().padStart(2, '0')}:${minutes}`;
-            
-            firstSessionDetails = {
-              date: formatDateString(reservation.dateKey),
-              timeSlot: reservation.timeSlot,
-              endTime,
-              instructor: reservation.instructor,
-            };
-          }
-        }
-      }
-    } else if (latestCode.reservationId) {
-      const reservation = await kv.get(latestCode.reservationId);
-      if (reservation) {
-        const [hours, minutes] = reservation.timeSlot.split(':');
-        const endTime = `${(parseInt(hours) + 1).toString().padStart(2, '0')}:${minutes}`;
-        
-        firstSessionDetails = {
-          date: formatDateString(reservation.dateKey),
-          timeSlot: reservation.timeSlot,
-          endTime,
-          instructor: reservation.instructor,
-        };
-      }
-    }
-
-    // Resend the activation email
-    await sendActivationEmail(
-      normalizedEmail,
-      user.name,
-      user.surname,
-      latestCode.code,
-      packageType,
-      firstSessionDetails
-    );
-
-    console.log(`Activation code resent to: ${normalizedEmail}`);
-
-    return c.json({
-      success: true,
-      message: 'Activation code resent successfully',
-      code: latestCode.code,
-    });
-  } catch (error) {
-    console.error('Error resending activation code:', error);
-    return c.json({ error: 'Failed to resend activation code', details: (error as Error).message }, 500);
-  }
+  console.warn('DEPRECATED: /admin/resend-activation-code endpoint called - activation codes are no longer used');
+  return c.json({
+    error: "Activation codes are no longer used",
+    message: "Package activation is now handled directly by the 'Activate' button in the admin panel.",
+    deprecated: true
+  }, 410);
 });
 
 // Admin activate package - generate password and send credentials
+// This is the ONLY way to activate a package and generate credentials
 app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
   try {
     const body = await c.req.json();
@@ -2353,6 +2686,32 @@ app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
       return c.json({ error: "User not found" }, 404);
     }
 
+    // Find the package to activate
+    let pkg = null;
+    if (packageId) {
+      pkg = await kv.get(packageId);
+    } else {
+      // Find user's pending package
+      const allPackages = await kv.getByPrefix('package:');
+      const userPackages = allPackages.filter((p: any) =>
+        p.userId === normalizedEmail && p.packageStatus === 'pending'
+      );
+      if (userPackages.length > 0) {
+        pkg = userPackages[0];
+      }
+    }
+
+    // IDEMPOTENCY CHECK - if package is already active, return early
+    if (pkg && pkg.packageStatus === 'active') {
+      console.log(`Package already activated for ${normalizedEmail} - returning early`);
+      return c.json({
+        success: true,
+        alreadyActivated: true,
+        message: 'Package already activated - no changes made',
+        email: normalizedEmail,
+      });
+    }
+
     // Generate random 8-character alphanumeric password
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     let temporaryPassword = '';
@@ -2368,56 +2727,69 @@ app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
     await kv.set(userKey, user);
     console.log(`Password set for user: ${normalizedEmail}`);
 
-    // If packageId provided, activate that specific package
-    if (packageId) {
-      const pkg = await kv.get(packageId);
-      if (pkg) {
-        pkg.packageStatus = 'active';
-        pkg.activationStatus = 'activated';
-        pkg.activationDate = new Date().toISOString();
-        pkg.expiryDate = calculateExpiry(pkg.activationDate);
-        pkg.paymentStatus = 'paid';
-        pkg.updatedAt = new Date().toISOString();
-        await kv.set(packageId, pkg);
-        console.log(`Package activated: ${packageId}`);
-
-        // Also activate first reservation if exists
-        if (pkg.firstReservationId) {
-          const firstReservation = await kv.get(pkg.firstReservationId);
-          if (firstReservation) {
-            firstReservation.reservationStatus = 'confirmed';
-            firstReservation.paymentStatus = 'paid';
-            firstReservation.activatedAt = new Date().toISOString();
-            firstReservation.updatedAt = new Date().toISOString();
-            await kv.set(pkg.firstReservationId, firstReservation);
-          }
-        }
-      }
+    // Determine language from package or user's last reservation
+    let language = 'EN';
+    if (pkg && pkg.language) {
+      language = pkg.language.toUpperCase();
     } else {
-      // Activate all pending packages for this user
-      const allPackages = await kv.getByPrefix('package:');
-      const userPackages = allPackages.filter((pkg: any) =>
-        pkg.userId === normalizedEmail && pkg.packageStatus === 'pending'
-      );
-
-      for (const pkg of userPackages) {
-        pkg.packageStatus = 'active';
-        pkg.activationStatus = 'activated';
-        pkg.activationDate = new Date().toISOString();
-        pkg.expiryDate = calculateExpiry(pkg.activationDate);
-        pkg.paymentStatus = 'paid';
-        pkg.updatedAt = new Date().toISOString();
-        await kv.set(pkg.id, pkg);
-        console.log(`Package activated: ${pkg.id}`);
+      const allReservations = await kv.getByPrefix('reservation:');
+      const userReservation = allReservations.find((r: any) => r.userId === normalizedEmail);
+      if (userReservation && userReservation.language) {
+        language = userReservation.language.toUpperCase();
       }
     }
 
-    // Determine language from user's last reservation or default to EN
-    let language = 'EN';
-    const allReservations = await kv.getByPrefix('reservation:');
-    const userReservation = allReservations.find((r: any) => r.userId === normalizedEmail);
-    if (userReservation && userReservation.language) {
-      language = userReservation.language.toUpperCase();
+    // Activate package if found
+    if (pkg) {
+      // Check if sessions were already decremented (legacy booking - backward compatibility)
+      const sessionsAlreadyDeducted = pkg.remainingSessions < pkg.totalSessions;
+
+      // Only decrement if not already done
+      if (!sessionsAlreadyDeducted) {
+        pkg.remainingSessions = pkg.totalSessions - 1;
+        console.log(`Session decremented for ${normalizedEmail}: ${pkg.remainingSessions}/${pkg.totalSessions}`);
+      } else {
+        console.log(`Sessions already deducted for ${normalizedEmail}: ${pkg.remainingSessions}/${pkg.totalSessions}`);
+      }
+
+      pkg.packageStatus = 'active';
+      pkg.activationStatus = 'activated';
+      pkg.activationDate = new Date().toISOString();
+      pkg.expiryDate = calculateExpiry(pkg.activationDate);
+      pkg.paymentStatus = 'paid';
+      pkg.updatedAt = new Date().toISOString();
+      await kv.set(pkg.id, pkg);
+      console.log(`Package activated: ${pkg.id}`);
+
+      // Activate first reservation if exists
+      if (pkg.firstReservationId) {
+        const firstReservation = await kv.get(pkg.firstReservationId);
+        if (firstReservation) {
+          firstReservation.reservationStatus = 'confirmed';
+          firstReservation.paymentStatus = 'paid';
+          firstReservation.activatedAt = new Date().toISOString();
+          firstReservation.updatedAt = new Date().toISOString();
+          await kv.set(pkg.firstReservationId, firstReservation);
+
+          // Also update reservation in Supabase
+          await updateReservationStatusInSupabase(pkg.firstReservationId, 'confirmed', 'paid');
+        }
+      }
+
+      // SYNC TO SUPABASE - update user with correct session counts
+      await saveUserToSupabase({
+        email: normalizedEmail,
+        name: user.name,
+        surname: user.surname,
+        mobile: user.mobile,
+        package_type: pkg.packageType,
+        total_sessions: pkg.totalSessions,
+        remaining_sessions: pkg.remainingSessions,
+        used_sessions: 1,
+        payment_status: 'paid',
+        language: language
+      });
+      console.log(`✅ User synced to Supabase after activation: ${normalizedEmail}`);
     }
 
     // Send email with login credentials
@@ -2515,26 +2887,23 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
     const userKey = `user:${normalizedEmail}`;
     let user = await kv.get(userKey);
 
-    if (selectedPackage) {
-      // Package booking: create user WITHOUT password (password set on activation)
-      if (!user) {
-        user = {
-          id: userKey,
-          email: normalizedEmail,
-          name,
-          surname,
-          mobile,
-          passwordHash: null, // No password - will be set on admin activation
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          blocked: false,
-          verified: false // Not verified until activation
-        };
-        await kv.set(userKey, user);
-        console.log(`User created for package booking (no password): ${normalizedEmail}`);
-      }
+    // Always create user record for all bookings (single or package)
+    if (!user) {
+      user = {
+        id: userKey,
+        email: normalizedEmail,
+        name,
+        surname,
+        mobile,
+        passwordHash: null, // No password - will be set on admin activation
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        blocked: false,
+        verified: false // Not verified until activation
+      };
+      await kv.set(userKey, user);
+      console.log(`User created for booking: ${normalizedEmail}`);
     }
-    // For single sessions: NO user creation - just the reservation
 
     const dateString = formatDateString(dateKey);
     const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -2579,6 +2948,44 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
 
     await kv.set(reservationId, reservation);
     console.log(`Booking created and confirmed: ${reservationId}`);
+
+    // *** SAVE TO SUPABASE TABLES ***
+    // Save user to Supabase (this is the source of truth for admin panel)
+    await saveUserToSupabase({
+      email: normalizedEmail,
+      name,
+      surname,
+      mobile,
+      package_type: selectedPackage || 'single',
+      total_sessions: selectedPackage ? parseInt(selectedPackage.match(/\d+/)?.[0] || '1') : 1,
+      payment_status: 'unpaid',
+      language: language || 'EN'
+    });
+
+    // Save reservation to Supabase
+    await saveReservationToSupabase({
+      user_email: normalizedEmail,
+      date_key: dateKey,
+      time_slot: timeSlot,
+      end_time: endTime,
+      instructor,
+      service_type: selectedPackage ? 'package' : 'single',
+      package_type: selectedPackage,
+      reservation_status: 'confirmed',
+      payment_status: 'unpaid',
+      name,
+      surname,
+      mobile
+    });
+
+    // Save to user_bookings table for tracking
+    await saveUserBookingToSupabase({
+      user_email: normalizedEmail,
+      user_name: name,
+      user_surname: surname,
+      date_key: dateKey,
+      time_slot: timeSlot
+    });
 
     // Send confirmation email based on booking type
     const langCode = (language || 'en').toUpperCase();
@@ -2663,9 +3070,14 @@ app.post("/make-server-b87b0c07/inquiry", async (c) => {
   }
 });
 
+// DEPRECATED: Activation is now handled by admin
 app.post("/make-server-b87b0c07/activate-member", async (c) => {
-  console.warn('Legacy /activate-member endpoint called - use /activate instead');
-  return c.redirect('/make-server-b87b0c07/activate');
+  console.warn('DEPRECATED: /activate-member endpoint called - this flow is no longer supported');
+  return c.json({
+    error: "This activation flow is no longer supported",
+    message: "Package activation is now handled by admin. Your account will be activated after payment at the studio.",
+    deprecated: true
+  }, 410);
 });
 
 // ============ MIGRATION ENDPOINT ============
@@ -2820,22 +3232,61 @@ app.get("/make-server-b87b0c07/admin/orphaned-packages", async (c) => {
   }
 });
 
-app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
+app.get("/make-server-b87b0c07/admin/calendar", async (c: any) => {
   try {
     const dateKey = c.req.query('dateKey');
-    
+
     if (!dateKey) {
       return c.json({ error: "dateKey parameter required" }, 400);
     }
 
-    const allReservations = await kv.getByPrefix('reservation:');
-    const dateReservations = allReservations.filter((r: any) => r.dateKey === dateKey);
+    // Get reservations from both KV and Supabase
+    const kvReservations = await kv.getByPrefix('reservation:');
+    const kvDateReservations = kvReservations.filter((r: any) => r.dateKey === dateKey);
+
+    // Also get from Supabase
+    const supabaseReservations = await getReservationsFromSupabase(dateKey);
+
+    // Merge reservations, preferring Supabase data but avoiding duplicates
+    const seenIds = new Set<string>();
+    const mergedReservations: any[] = [];
+
+    // Add Supabase reservations first (source of truth)
+    for (const res of supabaseReservations) {
+      const resForCalendar = {
+        id: res.id,
+        userId: res.user_email,
+        email: res.user_email,
+        name: res.name,
+        surname: res.surname,
+        mobile: res.mobile,
+        dateKey: res.date_key,
+        timeSlot: res.time_slot,
+        endTime: res.end_time,
+        instructor: res.instructor,
+        serviceType: res.service_type,
+        packageType: res.package_type,
+        reservationStatus: res.reservation_status,
+        paymentStatus: res.payment_status,
+        createdAt: res.created_at,
+      };
+      seenIds.add(res.user_email + res.time_slot);
+      mergedReservations.push(resForCalendar);
+    }
+
+    // Add KV reservations that aren't in Supabase
+    for (const res of kvDateReservations) {
+      const key = (res.userId || res.email) + res.timeSlot;
+      if (!seenIds.has(key)) {
+        mergedReservations.push(res);
+      }
+    }
 
     // Get time slots specific to this date
     const timeSlotsForDate = getTimeSlotsForDate(dateKey);
 
     const calendarData = await Promise.all(timeSlotsForDate.map(async (timeSlot) => {
-      const slotReservations = dateReservations.filter((r: any) =>
+      const slotReservations = mergedReservations.filter((r: any) =>
         r.timeSlot === timeSlot &&
         (r.reservationStatus === 'pending' || r.reservationStatus === 'confirmed' || r.reservationStatus === 'attended')
       );
@@ -2855,7 +3306,7 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c) => {
     }));
 
     return c.json({ success: true, dateKey, slots: calendarData });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching calendar:', error);
     return c.json({ error: 'Failed to fetch calendar', details: error.message }, 500);
   }
@@ -2932,86 +3383,15 @@ app.post("/make-server-b87b0c07/dev/generate-mock-data", async (c) => {
 
 // ============ AUTH ENDPOINTS ============
 
+// DEPRECATED: Password setup via verification token is no longer used
+// Passwords are now generated by admin during package activation
 app.post("/make-server-b87b0c07/auth/setup-password", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { token, password } = body;
-
-    if (!token) {
-      return c.json({ error: "Token and password are required" }, 400);
-    }
-
-    if (password.length < 6) {
-      return c.json({ error: "Password must be at least 6 characters" }, 400);
-    }
-
-    const tokenKey = `verification_token:${token}`;
-    const tokenData = await kv.get(tokenKey);
-
-    if (!tokenData) {
-      return c.json({ error: "Invalid or expired registration link" }, 400);
-    }
-
-    if (tokenData.used) {
-      return c.json({ error: "This registration link has already been used. Please log in instead." }, 400);
-    }
-
-    if (new Date(tokenData.expiresAt) < new Date()) {
-      return c.json({ error: "This registration link has expired. Please contact support." }, 400);
-    }
-
-    const normalizedEmail = normalizeEmail(tokenData.email);
-    const userKey = `user:${normalizedEmail}`;
-    const user = await kv.get(userKey);
-
-    if (!user) {
-      return c.json({ error: "User not found" }, 404);
-    }
-
-    if (user.passwordHash) {
-      return c.json({ error: "Password already set. Please log in instead." }, 400);
-    }
-
-    const passwordHash = await hashPassword(password);
-
-    user.passwordHash = passwordHash;
-    user.verified = true;
-    user.verificationToken = null;
-    user.updatedAt = new Date().toISOString();
-    await kv.set(userKey, user);
-
-    tokenData.used = true;
-    tokenData.usedAt = new Date().toISOString();
-    await kv.set(tokenKey, tokenData);
-
-    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
-    const sessionKey = `session:${sessionToken}`;
-    const sessionData = {
-      id: sessionKey,
-      token: sessionToken,
-      email: normalizedEmail,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    };
-    await kv.set(sessionKey, sessionData);
-
-    console.log(`Password set for user: ${normalizedEmail}`);
-
-    return c.json({
-      success: true,
-      message: "Registration complete! You can now log in.",
-      session: sessionToken,
-      user: {
-        email: normalizedEmail,
-        name: user.name,
-        surname: user.surname
-      }
-    });
-
-  } catch (error) {
-    console.error('Error setting up password:', error);
-    return c.json({ error: 'Failed to set up password', details: error.message }, 500);
-  }
+  console.warn('DEPRECATED: /auth/setup-password endpoint called - this flow is no longer supported');
+  return c.json({
+    error: "This registration flow is no longer supported",
+    message: "Your account will be activated by admin after payment. You will receive login credentials via email.",
+    deprecated: true
+  }, 410);
 });
 
 app.post("/make-server-b87b0c07/auth/register", async (c) => {
@@ -4077,6 +4457,128 @@ app.post('/make-server-b87b0c07/upload-logo', async (c) => {
   }
 });
 
+// ============ SYNC USERS FROM RESERVATIONS TO SUPABASE ============
+
+app.post("/make-server-b87b0c07/admin/sync-users", async (c: any) => {
+  try {
+    const allReservations = await kv.getByPrefix('reservation:');
+    const allPackages = await kv.getByPrefix('package:');
+    const allKvUsers = await kv.getByPrefix('user:');
+    let kvCreated = 0;
+    let supabaseCreated = 0;
+    const processedEmails = new Set<string>();
+
+    // Create user records from reservations
+    for (const res of allReservations) {
+      const email = (res.email || res.userId || '').toLowerCase();
+      if (!email || processedEmails.has(email)) continue;
+      processedEmails.add(email);
+
+      const userKey = `user:${email}`;
+      const existingUser = await kv.get(userKey);
+
+      if (!existingUser) {
+        const user = {
+          id: userKey,
+          email: email,
+          name: res.name || '',
+          surname: res.surname || '',
+          mobile: res.mobile || '',
+          passwordHash: null,
+          createdAt: res.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          blocked: false,
+          verified: false
+        };
+        await kv.set(userKey, user);
+        kvCreated++;
+        console.log(`Created KV user from reservation: ${email}`);
+      }
+
+      // Always sync to Supabase
+      await saveUserToSupabase({
+        email: email,
+        name: res.name || '',
+        surname: res.surname || '',
+        mobile: res.mobile || '',
+        package_type: res.packageType || 'single',
+        payment_status: res.paymentStatus || 'unpaid',
+        language: res.language || 'EN'
+      });
+      supabaseCreated++;
+    }
+
+    // Create user records from packages
+    for (const pkg of allPackages) {
+      const email = (pkg.email || pkg.userId || '').toLowerCase();
+      if (!email || processedEmails.has(email)) continue;
+      processedEmails.add(email);
+
+      const userKey = `user:${email}`;
+      const existingUser = await kv.get(userKey);
+
+      if (!existingUser) {
+        const user = {
+          id: userKey,
+          email: email,
+          name: pkg.name || '',
+          surname: pkg.surname || '',
+          mobile: pkg.mobile || '',
+          passwordHash: null,
+          createdAt: pkg.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          blocked: false,
+          verified: false
+        };
+        await kv.set(userKey, user);
+        kvCreated++;
+        console.log(`Created KV user from package: ${email}`);
+      }
+
+      // Always sync to Supabase
+      await saveUserToSupabase({
+        email: email,
+        name: pkg.name || '',
+        surname: pkg.surname || '',
+        mobile: pkg.mobile || '',
+        package_type: pkg.packageType || 'single',
+        payment_status: pkg.paymentStatus || 'unpaid',
+        language: pkg.language || 'EN'
+      });
+      supabaseCreated++;
+    }
+
+    // Sync existing KV users to Supabase
+    for (const user of allKvUsers) {
+      const email = (user.email || '').toLowerCase();
+      if (!email || processedEmails.has(email)) continue;
+      processedEmails.add(email);
+
+      await saveUserToSupabase({
+        email: email,
+        name: user.name || '',
+        surname: user.surname || '',
+        mobile: user.mobile || '',
+        package_type: 'single',
+        payment_status: 'unpaid',
+        language: user.language || 'EN'
+      });
+      supabaseCreated++;
+    }
+
+    return c.json({
+      success: true,
+      message: `Synced ${supabaseCreated} users to Supabase, created ${kvCreated} new KV users`,
+      kvCreated,
+      supabaseCreated,
+      totalProcessed: processedEmails.size
+    });
+  } catch (error: any) {
+    console.error('Error syncing users:', error);
+    return c.json({ error: 'Failed to sync users', details: error.message }, 500);
+  }
+});
+
 // ============ ADMIN DASHBOARD ENDPOINT ============
 
 app.get("/make-server-b87b0c07/admin/dashboard", async (c) => {
@@ -4316,6 +4818,19 @@ app.post("/make-server-b87b0c07/admin/users/:email/gift", async (c) => {
 
     await kv.set(userPackage.id, userPackage);
 
+    // *** UPDATE SUPABASE ***
+    const supabase = getSupabase();
+    await supabase
+      .from('users')
+      .update({
+        total_sessions: userPackage.totalSessions,
+        remaining_sessions: userPackage.remainingSessions,
+        gifted_sessions: userPackage.giftedSessions,
+        updated_at: new Date().toISOString()
+      })
+      .eq('email', normalizedEmail);
+    console.log(`✅ Gifted sessions synced to Supabase for: ${normalizedEmail}`);
+
     // Log the action
     const auditKey = `audit:${Date.now()}`;
     await kv.set(auditKey, {
@@ -4362,6 +4877,17 @@ app.post("/make-server-b87b0c07/admin/users/:email/block", async (c) => {
     user.updatedAt = new Date().toISOString();
 
     await kv.set(userKey, user);
+
+    // *** UPDATE SUPABASE ***
+    const supabase = getSupabase();
+    await supabase
+      .from('users')
+      .update({
+        blocked: blocked,
+        updated_at: new Date().toISOString()
+      })
+      .eq('email', normalizedEmail);
+    console.log(`✅ Block status synced to Supabase for: ${normalizedEmail}`);
 
     // Log the action
     const auditKey = `audit:${Date.now()}`;
@@ -4411,9 +4937,128 @@ app.get("/make-server-b87b0c07/admin/audit", async (c) => {
   }
 });
 
+// ============ ADMIN SETUP/STATUS ENDPOINT ============
+
+app.get("/make-server-b87b0c07/admin/setup-status", async (c: any) => {
+  try {
+    const supabase = getSupabase();
+    const status = {
+      usersTable: false,
+      reservationsTable: false,
+      usersCount: 0,
+      reservationsCount: 0,
+      errors: [] as string[]
+    };
+
+    // Check users table
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('id', { count: 'exact' })
+      .limit(1);
+
+    if (usersError) {
+      if (usersError.code === '42P01') {
+        status.errors.push('Users table does not exist - please create it in Supabase SQL Editor');
+      } else {
+        status.errors.push(`Users table error: ${usersError.message}`);
+      }
+    } else {
+      status.usersTable = true;
+      // Get count
+      const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+      status.usersCount = count || 0;
+    }
+
+    // Check reservations table
+    const { data: reservationsData, error: reservationsError } = await supabase
+      .from('reservations')
+      .select('id', { count: 'exact' })
+      .limit(1);
+
+    if (reservationsError) {
+      if (reservationsError.code === '42P01') {
+        status.errors.push('Reservations table does not exist - please create it in Supabase SQL Editor');
+      } else {
+        status.errors.push(`Reservations table error: ${reservationsError.message}`);
+      }
+    } else {
+      status.reservationsTable = true;
+      // Get count
+      const { count } = await supabase.from('reservations').select('*', { count: 'exact', head: true });
+      status.reservationsCount = count || 0;
+    }
+
+    const ready = status.usersTable && status.reservationsTable;
+
+    return c.json({
+      success: true,
+      ready,
+      status,
+      setupInstructions: ready ? null : {
+        message: 'Please create the tables in your Supabase SQL Editor',
+        sqlEditorUrl: 'https://supabase.com/dashboard/project/azqkguctispoctvmpmci/sql/new',
+        sql: `-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  surname TEXT NOT NULL,
+  mobile TEXT,
+  password_hash TEXT,
+  verified BOOLEAN DEFAULT FALSE,
+  blocked BOOLEAN DEFAULT FALSE,
+  package_type TEXT,
+  total_sessions INTEGER DEFAULT 0,
+  used_sessions INTEGER DEFAULT 0,
+  remaining_sessions INTEGER DEFAULT 0,
+  gifted_sessions INTEGER DEFAULT 0,
+  payment_status TEXT DEFAULT 'unpaid',
+  activation_code TEXT,
+  activation_status TEXT DEFAULT 'pending',
+  activated_at TIMESTAMPTZ,
+  package_expiry_date TIMESTAMPTZ,
+  language TEXT DEFAULT 'EN',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- Create reservations table
+CREATE TABLE IF NOT EXISTS reservations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_email TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  time_slot TEXT NOT NULL,
+  end_time TEXT,
+  instructor TEXT DEFAULT 'Rina',
+  service_type TEXT DEFAULT 'single',
+  package_type TEXT,
+  session_number INTEGER,
+  reservation_status TEXT DEFAULT 'pending',
+  payment_status TEXT DEFAULT 'unpaid',
+  name TEXT NOT NULL,
+  surname TEXT NOT NULL,
+  mobile TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reservations_user_email ON reservations(user_email);
+CREATE INDEX IF NOT EXISTS idx_reservations_date_key ON reservations(date_key);`
+      }
+    });
+  } catch (error: any) {
+    console.error('Error checking setup status:', error);
+    return c.json({ error: 'Failed to check setup status', details: error.message }, 500);
+  }
+});
+
 // ============ SERVER STARTUP ============
 
-console.log('🚀 WellNest Pilates Server Starting...');
+console.log('WellNest Pilates Server Starting...');
 console.log('📧 Email Configuration:');
 const hasResendKey = !!Deno.env.get('RESEND_API_KEY');
 console.log(`   - RESEND_API_KEY: ${hasResendKey ? '✅ Configured' : '❌ Missing'}`);

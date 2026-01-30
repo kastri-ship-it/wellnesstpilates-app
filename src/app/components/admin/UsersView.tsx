@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Search, Filter, ChevronDown, ChevronUp, Mail, Gift, Ban, CheckCircle,
-  Phone, Calendar, Package, User, X
+  Phone, Calendar, Package, User, X, Clock
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
@@ -21,24 +21,39 @@ type UserData = {
     purchasedDate: string;
   }>;
   isBlocked?: boolean;
+  packageType?: string;
 };
 
-type FilterType = 'all' | 'paid' | 'pending' | 'blocked';
+type UserBooking = {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userSurname: string;
+  dateKey: string;
+  timeSlot: string;
+  bookingDate: string;
+  status: string;
+  createdAt: string;
+};
+
+type FilterType = 'paid' | 'pending' | 'blocked';
 
 export function UsersView() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('paid');
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [giftSessions, setGiftSessions] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [userBookings, setUserBookings] = useState<Record<string, UserBooking[]>>({});
 
   useEffect(() => {
     fetchUsers();
+    fetchUserBookings();
   }, []);
 
   useEffect(() => {
@@ -61,6 +76,31 @@ export function UsersView() {
       console.error('Error fetching users:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUserBookings = async () => {
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/user-bookings`,
+        {
+          headers: { 'Authorization': `Bearer ${publicAnonKey}` },
+        }
+      );
+
+      const data = await response.json();
+      // Group bookings by user email
+      const grouped: Record<string, UserBooking[]> = {};
+      (data.bookings || []).forEach((booking: UserBooking) => {
+        const email = booking.userEmail;
+        if (!grouped[email]) {
+          grouped[email] = [];
+        }
+        grouped[email].push(booking);
+      });
+      setUserBookings(grouped);
+    } catch (error) {
+      console.error('Error fetching user bookings:', error);
     }
   };
 
@@ -129,32 +169,6 @@ export function UsersView() {
     }
   };
 
-  const handleSendCode = async (user: UserData) => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/resend-activation-code`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({ email: user.email }),
-        }
-      );
-
-      if (response.ok) {
-        alert(`Activation code resent to ${user.email}`);
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Failed to send code');
-      }
-    } catch (error) {
-      console.error('Error sending code:', error);
-      alert('Network error. Please try again.');
-    }
-  };
-
   const handleToggleBlock = async (user: UserData) => {
     const action = user.isBlocked ? 'unblock' : 'block';
     if (!confirm(`Are you sure you want to ${action} ${user.name} ${user.surname}?`)) {
@@ -183,10 +197,9 @@ export function UsersView() {
   };
 
   const filters: { id: FilterType; label: string; count: number }[] = [
-    { id: 'all', label: 'All', count: users.length },
     { id: 'paid', label: 'Paid', count: users.filter((u) => u.paymentStatus === 'paid').length },
     { id: 'pending', label: 'Pending', count: users.filter((u) => u.paymentStatus !== 'paid').length },
-    { id: 'blocked', label: 'Blocked', count: users.filter((u) => u.isBlocked).length },
+    { id: 'blocked', label: 'Blacklist', count: users.filter((u) => u.isBlocked).length },
   ];
 
   const getPackageLabel = (type: string) => {
@@ -195,6 +208,44 @@ export function UsersView() {
     if (type === 'package12') return '12 Sessions';
     if (type === 'single') return 'Single';
     return type;
+  };
+
+  const formatBookingDate = (dateKey: string) => {
+    const [month, day] = dateKey.split('-').map(Number);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${day} ${monthNames[month - 1]}`;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'attended': return 'bg-green-100 text-green-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
+      case 'no_show': return 'bg-orange-100 text-orange-700';
+      default: return 'bg-blue-100 text-blue-700';
+    }
+  };
+
+  const getNextClass = (email: string) => {
+    const bookings = userBookings[email] || [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    // Filter for upcoming bookings (pending/confirmed/booked status, future date)
+    const upcomingBookings = bookings
+      .filter(b => b.status === 'pending' || b.status === 'confirmed' || b.status === 'booked')
+      .map(b => {
+        const [month, day] = b.dateKey.split('-').map(Number);
+        const bookingDate = new Date(currentYear, month - 1, day);
+        // If booking month is before current month, it's probably next year
+        if (bookingDate < now && month < now.getMonth() + 1) {
+          bookingDate.setFullYear(currentYear + 1);
+        }
+        return { ...b, date: bookingDate };
+      })
+      .filter(b => b.date >= now)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    return upcomingBookings[0] || null;
   };
 
   return (
@@ -279,6 +330,11 @@ export function UsersView() {
                         <p className="font-medium text-[#3d2f28] truncate">
                           {user.name} {user.surname}
                         </p>
+                        {user.packageType && (
+                          <span className="px-2 py-0.5 bg-[#6b5949]/10 text-[#6b5949] text-xs rounded-full">
+                            {getPackageLabel(user.packageType)}
+                          </span>
+                        )}
                         {user.isBlocked && (
                           <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
                             Blocked
@@ -319,16 +375,36 @@ export function UsersView() {
                       </div>
                     </div>
 
+                    {/* Next Class */}
+                    {(() => {
+                      const nextClass = getNextClass(user.email);
+                      return (
+                        <div className={`rounded-lg p-3 ${nextClass ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Calendar className="w-4 h-4 text-green-600" />
+                            <span className="font-medium text-[#3d2f28]">Next Class</span>
+                          </div>
+                          {nextClass ? (
+                            <p className="text-sm text-green-700 font-medium">
+                              {formatBookingDate(nextClass.dateKey)} at {nextClass.timeSlot}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-[#8b7764]">No upcoming class scheduled</p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Package Info */}
                     <div className="bg-white rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <Package className="w-4 h-4 text-[#6b5949]" />
                         <span className="font-medium text-[#3d2f28]">Package</span>
                       </div>
-                      {user.packages.length > 0 ? (
+                      {(user.packages.length > 0 || user.packageType) ? (
                         <div>
                           <p className="text-sm text-[#3d2f28]">
-                            {getPackageLabel(user.packages[0].type)}
+                            {getPackageLabel(user.packages[0]?.type || user.packageType || 'single')}
                           </p>
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-[#8b7764]">Sessions remaining</span>
@@ -336,17 +412,56 @@ export function UsersView() {
                               {user.remainingSessions} / {user.totalSessions}
                             </span>
                           </div>
-                          <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#6b5949] transition-all"
-                              style={{
-                                width: `${((user.totalSessions - user.remainingSessions) / user.totalSessions) * 100}%`,
-                              }}
-                            />
-                          </div>
+                          {user.totalSessions > 0 && (
+                            <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#6b5949] transition-all"
+                                style={{
+                                  width: `${((user.totalSessions - user.remainingSessions) / user.totalSessions) * 100}%`,
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm text-[#8b7764]">No active package</p>
+                      )}
+                    </div>
+
+                    {/* User Bookings */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="w-4 h-4 text-[#6b5949]" />
+                        <span className="font-medium text-[#3d2f28]">Booked Sessions</span>
+                        {userBookings[user.email]?.length > 0 && (
+                          <span className="px-2 py-0.5 bg-[#6b5949]/10 text-[#6b5949] text-xs rounded-full">
+                            {userBookings[user.email].length}
+                          </span>
+                        )}
+                      </div>
+                      {userBookings[user.email]?.length > 0 ? (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {userBookings[user.email].map((booking) => (
+                            <div
+                              key={booking.id}
+                              className="flex items-center justify-between p-2 bg-[#f5f0ed] rounded-lg"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-[#8b7764]" />
+                                <div>
+                                  <p className="text-sm font-medium text-[#3d2f28]">
+                                    {formatBookingDate(booking.dateKey)} at {booking.timeSlot}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className={`px-2 py-0.5 text-xs rounded-full capitalize ${getStatusColor(booking.status)}`}>
+                                {booking.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[#8b7764]">No bookings yet</p>
                       )}
                     </div>
 
@@ -361,14 +476,6 @@ export function UsersView() {
                       >
                         <Gift className="w-4 h-4" />
                         Gift Sessions
-                      </button>
-
-                      <button
-                        onClick={() => handleSendCode(user)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium bg-[#6b5949] text-white hover:bg-[#5a4838] transition-colors"
-                      >
-                        <Mail className="w-4 h-4" />
-                        Send Code
                       </button>
 
                       <button

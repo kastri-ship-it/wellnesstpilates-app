@@ -12,6 +12,7 @@ type BookingScreenProps = {
   onSubmit: (bookingData: any) => void;
   onInstructorClick: (instructorName: string) => void;
   language: Language;
+  refreshKey?: number;
 };
 
 type TimeSlot = {
@@ -85,7 +86,7 @@ const generateWeekdayDates = (language: Language) => {
   return dates;
 };
 
-export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClick, language }: BookingScreenProps) {
+export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClick, language, refreshKey }: BookingScreenProps) {
   const t = translations[language];
   const [currentTime, setCurrentTime] = useState<Date>(getSkopjeTime());
   const [allBookings, setAllBookings] = useState<any[]>([]);
@@ -121,9 +122,9 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
     
     // Refresh every 30 seconds to show real-time availability
     const interval = setInterval(fetchBookings, 30000);
-    
+
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshKey]);
   
   // Update current time every 10 seconds
   useEffect(() => {

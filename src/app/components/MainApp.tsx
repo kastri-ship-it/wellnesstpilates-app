@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Globe, User, Shield } from 'lucide-react';
 import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { translations } from '@/app/translations';
 import { TrainingTypeSelection } from './TrainingTypeSelection';
@@ -10,14 +9,11 @@ import { DuoTraining } from './DuoTraining';
 import { ConfirmationScreen } from './ConfirmationScreen';
 import { SuccessScreen } from './SuccessScreen';
 import { InstructorProfile } from './InstructorProfile';
-import { MemberActivationModal } from './MemberActivationModal';
 import { LoginRegisterModal } from './LoginRegisterModal';
 import { UserDashboard } from './UserDashboard';
 import { AdminLogin } from './AdminLogin';
 import { AdminPanelV2 } from './admin/AdminPanelV2';
-import { PasswordSetupPage } from './PasswordSetupPage';
 import { LoginPage } from './LoginPage';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 type Screen =
   | { type: 'trainingType' }
@@ -37,14 +33,13 @@ export function MainApp() {
   const t = translations[language];
   
   const [screen, setScreen] = useState<Screen>({ type: 'trainingType' });
-  const [showMemberActivation, setShowMemberActivation] = useState(false);
   const [showLoginRegister, setShowLoginRegister] = useState(false);
-  const [hasCleared, setHasCleared] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [logoClickTimer, setLogoClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [currentRoute, setCurrentRoute] = useState<string>('');
   const [userSession, setUserSession] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [bookingRefreshKey, setBookingRefreshKey] = useState(0);
 
   // Handle hash-based routing for authentication pages
   useEffect(() => {
@@ -77,56 +72,6 @@ export function MainApp() {
     window.scrollTo(0, 0);
   }, [screen]);
 
-  // Clear all data on first load
-  useEffect(() => {
-    const clearData = async () => {
-      if (hasCleared) return;
-      
-      try {
-        console.log('🧹 Clearing all existing data...');
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/dev/clear-all-data`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`,
-            },
-          }
-        );
-
-        // Get response text first
-        const responseText = await response.text();
-        
-        // Check if response is ok
-        if (!response.ok) {
-          console.error('❌ Failed to clear data:', response.status, responseText);
-          setHasCleared(true); // Prevent infinite retry
-          return;
-        }
-
-        // Try to parse JSON
-        let data;
-        try {
-          data = responseText ? JSON.parse(responseText) : {};
-        } catch (parseError) {
-          console.error('❌ JSON parse error:', parseError);
-          console.log('Response text was:', responseText);
-          setHasCleared(true); // Prevent infinite retry
-          return;
-        }
-
-        console.log('✅ Data cleared successfully:', data);
-        setHasCleared(true);
-      } catch (error) {
-        console.error('Error clearing data:', error);
-        setHasCleared(true); // Prevent infinite retry
-      }
-    };
-
-    clearData();
-  }, [hasCleared]);
-
   const handleSelectTrainingType = (type: 'single' | 'package' | 'individual' | 'duo') => {
     if (type === 'individual') {
       setScreen({ type: 'individual' });
@@ -150,6 +95,10 @@ export function MainApp() {
     setScreen({ type: 'success', bookingData });
   };
 
+  const handleBookingComplete = () => {
+    setBookingRefreshKey(prev => prev + 1);
+  };
+
   const handleInstructorClick = (instructorName: string) => {
     setScreen({ type: 'instructorProfile', instructorName });
   };
@@ -160,10 +109,6 @@ export function MainApp() {
 
   const handleSuccessBack = () => {
     setScreen({ type: 'trainingType' });
-  };
-
-  const handleMemberActivation = () => {
-    setShowMemberActivation(true);
   };
 
   const handleLoginSuccess = (user: any, needsActivation: boolean) => {
@@ -225,50 +170,35 @@ export function MainApp() {
     setLogoClickTimer(newTimer);
   };
 
-  // Render auth pages first (full screen, no container)
-  if (currentRoute.includes('#/setup-password') || currentRoute === '#/login') {
-    return (
-      <>
-        {currentRoute.includes('#/setup-password') && (
-          <PasswordSetupPage
-            onComplete={(session, user) => {
-              setUserSession(session);
-              setCurrentUser(user);
-              window.location.hash = '';
-              setScreen({
-                type: 'userDashboard',
-                userEmail: user.email,
-                userName: user.name,
-                userSurname: user.surname,
-                userPackage: null,
-                sessionsRemaining: 0
-              });
-            }}
-          />
-        )}
+  // Redirect deprecated setup-password routes to login
+  // Password setup is now handled by admin activation
+  if (currentRoute.includes('#/setup-password')) {
+    window.location.hash = '#/login';
+    return null;
+  }
 
-        {currentRoute === '#/login' && !currentRoute.includes('setup-password') && (
-          <LoginPage
-            onLogin={(session, user) => {
-              setUserSession(session);
-              setCurrentUser(user);
-              window.location.hash = '';
-              setScreen({
-                type: 'userDashboard',
-                userEmail: user.email,
-                userName: user.name,
-                userSurname: user.surname,
-                userPackage: null,
-                sessionsRemaining: 0
-              });
-            }}
-            onBack={() => {
-              window.location.hash = '';
-              setScreen({ type: 'trainingType' });
-            }}
-          />
-        )}
-      </>
+  // Render login page (full screen, no container)
+  if (currentRoute === '#/login') {
+    return (
+      <LoginPage
+        onLogin={(session, user) => {
+          setUserSession(session);
+          setCurrentUser(user);
+          window.location.hash = '';
+          setScreen({
+            type: 'userDashboard',
+            userEmail: user.email,
+            userName: user.name,
+            userSurname: user.surname,
+            userPackage: null,
+            sessionsRemaining: 0
+          });
+        }}
+        onBack={() => {
+          window.location.hash = '';
+          setScreen({ type: 'trainingType' });
+        }}
+      />
     );
   }
 
@@ -293,6 +223,7 @@ export function MainApp() {
           onSubmit={handleBookingSubmit}
           onInstructorClick={handleInstructorClick}
           language={language}
+          refreshKey={bookingRefreshKey}
         />
       )}
 
@@ -337,6 +268,7 @@ export function MainApp() {
             });
           }}
           language={language}
+          onBookingComplete={handleBookingComplete}
         />
       )}
 
@@ -377,14 +309,6 @@ export function MainApp() {
 
       {screen.type === 'adminPanel' && (
         <AdminPanelV2 onLogout={handleBack} />
-      )}
-
-      {/* Member Activation Modal */}
-      {showMemberActivation && (
-        <MemberActivationModal
-          onClose={() => setShowMemberActivation(false)}
-          language={language}
-        />
       )}
 
       {/* Login/Register Modal */}
