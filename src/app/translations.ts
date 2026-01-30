@@ -294,6 +294,20 @@ export const translations = {
     // Inquiry popup (Individual/DUO)
     inquiryReceived: 'Kërkesa u pranua!',
     inquiryReceivedDesc: 'Faleminderit për interesin tuaj! Ekipi ynë do t\'ju kontaktojë brenda 24 orëve për të caktuar seancën tuaj.',
+
+    // Three-section class management
+    myFirmClasses: 'Klasat e mia',
+    addClass: 'Shto klasë',
+    removeClass: 'Hiq',
+    availableClasses: 'Klasat e disponueshme',
+    slotsUsed: 'Klasë të përdorura',
+    done: 'Mbarova',
+    confirmRemove: 'Hiq këtë klasë?',
+    emptySlot: 'Slot i lirë',
+    of: 'nga',
+    used: 'Përdorur',
+    remaining: 'të mbetura',
+    upcomingClasses: 'Klasat e ardhshme',
   },
 
   MK: {
@@ -589,6 +603,20 @@ export const translations = {
     // Inquiry popup (Individual/DUO)
     inquiryReceived: 'Барањето е примено!',
     inquiryReceivedDesc: 'Ви благодариме за интересот! Нашиот тим ќе ве контактира во рок од 24 часа за да закажеме ваша сесија.',
+
+    // Three-section class management
+    myFirmClasses: 'Мои класи',
+    addClass: 'Додади класа',
+    removeClass: 'Отстрани',
+    availableClasses: 'Достапни класи',
+    slotsUsed: 'Искористени класи',
+    done: 'Готово',
+    confirmRemove: 'Отстрани ја оваа класа?',
+    emptySlot: 'Празен слот',
+    of: 'од',
+    used: 'Искористени',
+    remaining: 'преостанати',
+    upcomingClasses: 'Претстојни класи',
   },
 
   EN: {
@@ -870,5 +898,19 @@ export const translations = {
     // Inquiry popup (Individual/DUO)
     inquiryReceived: 'Inquiry Received!',
     inquiryReceivedDesc: 'Thank you for your interest! Our team will contact you within 24 hours to schedule your session.',
+
+    // Three-section class management
+    myFirmClasses: 'My Classes',
+    addClass: 'Add Class',
+    removeClass: 'Remove',
+    availableClasses: 'Available Classes',
+    slotsUsed: 'Slots used',
+    done: 'Done',
+    confirmRemove: 'Remove this class?',
+    emptySlot: 'Empty Slot',
+    of: 'of',
+    used: 'Used',
+    remaining: 'remaining',
+    upcomingClasses: 'Upcoming Classes',
   },
 };

@@ -3625,20 +3625,41 @@ app.get("/make-server-b87b0c07/user/packages", async (c) => {
       }
     }
 
-    // Build packages with firstSession embedded
-    const packagesWithFirstSession = allPackages.map((pkg: any) => {
-      // Find the first reservation for this package/user
-      const firstRes = userReservations.find((r: any) =>
-        r.packageId === pkg.id || r.userId === pkg.userId
-      ) || userReservations[0]; // fallback to first reservation
+    // Build packages with all sessions embedded
+    const packagesWithSessions = allPackages.map((pkg: any) => {
+      // Find all reservations for this package/user
+      const packageReservations = userReservations.filter((r: any) =>
+        r.packageId === pkg.id || r.userId === pkg.userId || r.email === pkg.email
+      );
 
+      // Sort by date and time for consistent ordering
+      packageReservations.sort((a: any, b: any) => {
+        const dateCompare = (a.dateKey || '').localeCompare(b.dateKey || '');
+        if (dateCompare !== 0) return dateCompare;
+        return (a.timeSlot || '').localeCompare(b.timeSlot || '');
+      });
+
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+      // Build sessions array with full details
+      const sessions = packageReservations.map((res: any) => {
+        const [month, day] = (res.dateKey || '').split('-');
+        const formattedDate = month && day ? `${day} ${monthNames[parseInt(month) - 1]} 2026` : '';
+        return {
+          id: res.id,
+          dateKey: res.dateKey,
+          timeSlot: res.timeSlot,
+          endTime: calculateEndTime(res.timeSlot, res.dateKey),
+          displayDate: formattedDate
+        };
+      });
+
+      // Keep firstSession for backward compatibility
+      const firstRes = packageReservations[0];
       let firstSession = null;
       if (firstRes) {
-        // Format dateKey to readable date
         const [month, day] = (firstRes.dateKey || '').split('-');
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
         const formattedDate = month && day ? `${day} ${monthNames[parseInt(month) - 1]} 2026` : '';
-
         firstSession = {
           id: firstRes.id,
           date: formattedDate,
@@ -3650,14 +3671,15 @@ app.get("/make-server-b87b0c07/user/packages", async (c) => {
 
       return {
         ...pkg,
+        sessions,
         firstSession,
-        sessionsBooked: userReservations.map((r: any) => r.id)
+        sessionsBooked: packageReservations.map((r: any) => r.id)
       };
     });
 
     return c.json({
       success: true,
-      packages: packagesWithFirstSession,
+      packages: packagesWithSessions,
       reservations: userReservations
     });
 
@@ -3734,6 +3756,317 @@ app.post("/make-server-b87b0c07/user/packages/:id/reschedule", async (c) => {
   } catch (error) {
     console.error('Error rescheduling session:', error);
     return c.json({ error: 'Failed to reschedule session', details: error.message }, 500);
+  }
+});
+
+// ============ ADD SESSION TO PACKAGE ============
+app.post("/make-server-b87b0c07/user/packages/:id/sessions", async (c) => {
+  try {
+    const packageId = c.req.param('id');
+    const sessionToken = c.req.header('X-Session-Token');
+    const body = await c.req.json();
+    const { dateKey, timeSlot } = body;
+
+    if (!sessionToken) {
+      return c.json({ error: "No session token provided" }, 401);
+    }
+
+    if (!dateKey || !timeSlot) {
+      return c.json({ error: "Missing required fields: dateKey and timeSlot" }, 400);
+    }
+
+    // Verify session
+    const sessionKey = `session:${sessionToken}`;
+    const session = await kv.get(sessionKey);
+
+    if (!session || new Date(session.expiresAt) < new Date()) {
+      return c.json({ error: "Invalid or expired session" }, 401);
+    }
+
+    const userEmail = session.email;
+
+    // Get package - try KV first, then check if it's a virtual package
+    let pkg = await kv.get(packageId);
+
+    // If not found in KV, check if it's a virtual package from Supabase
+    if (!pkg && packageId.includes(':virtual')) {
+      const supabase = getSupabase();
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .single();
+
+      if (userData && !userError) {
+        pkg = {
+          id: packageId,
+          userId: userEmail,
+          email: userEmail,
+          name: userData.name,
+          surname: userData.surname,
+          mobile: userData.mobile,
+          packageType: userData.package_type || 'single',
+          totalSessions: userData.total_sessions || 1,
+          remainingSessions: userData.remaining_sessions ?? (userData.total_sessions || 1),
+          usedSessions: userData.used_sessions || 0,
+          packageStatus: userData.payment_status === 'paid' ? 'active' : 'pending',
+          paymentStatus: userData.payment_status || 'unpaid',
+          sessionsBooked: [],
+          language: userData.language || 'EN'
+        };
+      }
+    }
+
+    if (!pkg) {
+      return c.json({ error: "Package not found" }, 404);
+    }
+
+    // Verify user owns this package
+    if (pkg.email !== userEmail && pkg.userId !== userEmail) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    // Check if package has remaining sessions
+    if (pkg.remainingSessions <= 0) {
+      return c.json({ error: "No remaining sessions in this package" }, 400);
+    }
+
+    // Check slot availability
+    const serviceType = extractServiceType(pkg.packageType);
+    const capacity = await calculateSlotCapacity(dateKey, timeSlot);
+
+    if (serviceType === 'individual' && capacity.available < 4) {
+      return c.json({ error: "Slot not available for 1-on-1 session (needs 4 seats)" }, 400);
+    } else if (serviceType === 'duo' && capacity.available < 2) {
+      return c.json({ error: "Slot not available for DUO session (needs 2 seats)" }, 400);
+    } else if (capacity.available < 1) {
+      return c.json({ error: "Slot is full" }, 400);
+    }
+
+    // Check for duplicate booking at same time
+    const allReservations = await kv.getByPrefix('reservation:');
+    const duplicateBooking = allReservations.find((r: any) =>
+      r.userId === userEmail && r.dateKey === dateKey && r.timeSlot === timeSlot
+    );
+    if (duplicateBooking) {
+      return c.json({ error: "You already have a booking at this time" }, 400);
+    }
+
+    // Create the reservation
+    const dateString = formatDateString(dateKey);
+    const reservationId = `reservation:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullDate = constructFullDate(dateKey, timeSlot);
+    const endTime = calculateEndTime(timeSlot);
+
+    const sessionNumber = (pkg.sessionsBooked?.length || 0) + 1;
+
+    const reservation = {
+      id: reservationId,
+      userId: userEmail,
+      packageId: pkg.id,
+      sessionNumber,
+      serviceType,
+      dateKey,
+      date: dateString,
+      fullDate,
+      timeSlot,
+      endTime,
+      instructor: null,
+      name: pkg.name,
+      surname: pkg.surname,
+      email: userEmail,
+      mobile: pkg.mobile,
+      partnerName: null,
+      partnerSurname: null,
+      reservationStatus: pkg.packageStatus === 'active' ? 'confirmed' : 'pending',
+      paymentStatus: pkg.paymentStatus,
+      seatsOccupied: serviceType === 'duo' ? 2 : (serviceType === 'individual' ? 4 : 1),
+      isPrivateSession: serviceType === 'individual',
+      isOverbooked: false,
+      isFirstSessionOfPackage: sessionNumber === 1,
+      autoConfirmed: pkg.packageStatus === 'active',
+      lateCancellation: false,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      activatedAt: null,
+      attendedAt: null,
+      language: pkg.language || 'EN'
+    };
+
+    await kv.set(reservationId, reservation);
+
+    // Update package
+    if (!pkg.sessionsBooked) pkg.sessionsBooked = [];
+    pkg.sessionsBooked.push(reservationId);
+    if (!pkg.firstReservationId) {
+      pkg.firstReservationId = reservationId;
+    }
+    pkg.updatedAt = new Date().toISOString();
+    await kv.set(packageId.includes(':virtual') ? packageId : pkg.id, pkg);
+
+    // Save reservation to Supabase
+    await saveReservationToSupabase({
+      user_email: userEmail,
+      date_key: dateKey,
+      time_slot: timeSlot,
+      end_time: endTime,
+      service_type: serviceType,
+      package_type: pkg.packageType,
+      reservation_status: reservation.reservationStatus,
+      payment_status: pkg.paymentStatus || 'unpaid',
+      name: pkg.name,
+      surname: pkg.surname
+    });
+
+    console.log(`Added session ${reservationId} to package ${packageId} for user ${userEmail}`);
+
+    // Return the new session with display info
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const [month, day] = dateKey.split('-');
+    const displayDate = month && day ? `${day} ${monthNames[parseInt(month) - 1]} 2026` : '';
+
+    return c.json({
+      success: true,
+      message: "Session added successfully",
+      session: {
+        id: reservationId,
+        dateKey,
+        timeSlot,
+        endTime,
+        displayDate
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding session:', error);
+    return c.json({ error: 'Failed to add session', details: (error as Error).message }, 500);
+  }
+});
+
+// ============ REMOVE SESSION FROM PACKAGE ============
+app.delete("/make-server-b87b0c07/user/packages/:packageId/sessions/:sessionId", async (c) => {
+  try {
+    const packageId = c.req.param('packageId');
+    const sessionId = c.req.param('sessionId');
+    const sessionToken = c.req.header('X-Session-Token');
+
+    if (!sessionToken) {
+      return c.json({ error: "No session token provided" }, 401);
+    }
+
+    // Verify session
+    const sessionKey = `session:${sessionToken}`;
+    const session = await kv.get(sessionKey);
+
+    if (!session || new Date(session.expiresAt) < new Date()) {
+      return c.json({ error: "Invalid or expired session" }, 401);
+    }
+
+    const userEmail = session.email;
+
+    // Get the reservation
+    const reservation = await kv.get(sessionId);
+    if (!reservation) {
+      // Try Supabase
+      const supabase = getSupabase();
+      const { data: supabaseRes, error } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (!supabaseRes || error) {
+        return c.json({ error: "Session not found" }, 404);
+      }
+
+      // Verify ownership
+      if (supabaseRes.user_email !== userEmail) {
+        return c.json({ error: "Unauthorized" }, 403);
+      }
+
+      // Check 24h rule
+      const classDateTime = new Date(`2026-${supabaseRes.date_key}T${supabaseRes.time_slot}`);
+      const now = new Date();
+      const hoursUntilClass = (classDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      if (hoursUntilClass < 24) {
+        return c.json({ error: `Cannot remove session within 24 hours of class time. ${Math.round(hoursUntilClass)} hours remaining.` }, 400);
+      }
+
+      // Delete from Supabase
+      await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', sessionId);
+
+      // Update user's remaining sessions
+      await supabase
+        .from('users')
+        .update({
+          remaining_sessions: supabase.rpc('increment', { column_name: 'remaining_sessions', increment_value: 1 })
+        })
+        .eq('email', userEmail);
+
+      console.log(`Removed session ${sessionId} from Supabase for user ${userEmail}`);
+
+      return c.json({
+        success: true,
+        message: "Session removed successfully"
+      });
+    }
+
+    // Verify user owns this reservation
+    if (reservation.userId !== userEmail && reservation.email !== userEmail) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    // Check 24h rule
+    const classDateTime = new Date(reservation.fullDate);
+    const now = new Date();
+    const hoursUntilClass = (classDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (hoursUntilClass < 24) {
+      return c.json({ error: `Cannot remove session within 24 hours of class time. ${Math.round(hoursUntilClass)} hours remaining.` }, 400);
+    }
+
+    // Delete from KV
+    await kv.del(sessionId);
+
+    // Update package in KV if it exists
+    let pkg = await kv.get(packageId);
+    if (pkg) {
+      if (pkg.sessionsBooked) {
+        pkg.sessionsBooked = pkg.sessionsBooked.filter((id: string) => id !== sessionId);
+      }
+      if (pkg.firstReservationId === sessionId) {
+        pkg.firstReservationId = pkg.sessionsBooked?.[0] || null;
+      }
+      pkg.updatedAt = new Date().toISOString();
+      await kv.set(packageId, pkg);
+    }
+
+    // Delete from Supabase
+    const supabase = getSupabase();
+    await supabase
+      .from('reservations')
+      .delete()
+      .eq('user_email', userEmail)
+      .eq('date_key', reservation.dateKey)
+      .eq('time_slot', reservation.timeSlot);
+
+    console.log(`Removed session ${sessionId} from package ${packageId} for user ${userEmail}`);
+
+    return c.json({
+      success: true,
+      message: "Session removed successfully"
+    });
+
+  } catch (error) {
+    console.error('Error removing session:', error);
+    return c.json({ error: 'Failed to remove session', details: (error as Error).message }, 500);
   }
 });
 
