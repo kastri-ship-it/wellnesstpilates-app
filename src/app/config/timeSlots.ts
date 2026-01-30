@@ -10,7 +10,7 @@ export const DATE_SPECIFIC_SLOTS: Record<string, string[]> = {
 // Date-specific session durations (in minutes)
 export const DATE_SPECIFIC_DURATIONS: Record<string, number> = {
   '1-29': 50,  // January 29: 50 min sessions
-  '1-30': 45,  // January 30: 45 min sessions
+  '1-30': 50,  // January 30: 50 min sessions
 };
 
 // Default time slots for all other dates

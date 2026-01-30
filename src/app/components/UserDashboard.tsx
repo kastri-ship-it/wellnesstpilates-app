@@ -23,10 +23,8 @@ type PackageDetails = {
     dateKey: string;
     time: string;
     endTime: string;
-    instructor: string;
   } | null;
   createdAt: string;
-  activationCodeId: string;
 };
 
 type TimeSlot = {
@@ -50,6 +48,8 @@ export function UserDashboard({ onBack, language, sessionToken, userEmail }: Use
   const [selectedPackage, setSelectedPackage] = useState<PackageDetails | null>(null);
   const [availableSlots, setAvailableSlots] = useState<DateSlot[]>([]);
   const [isRescheduling, setIsRescheduling] = useState(false);
+  const [upcomingClasses, setUpcomingClasses] = useState<DateSlot[]>([]);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(true);
 
   // Get session token from prop or localStorage as fallback
   const activeSessionToken = sessionToken || localStorage.getItem('wellnest_session') || '';
@@ -140,6 +140,42 @@ export function UserDashboard({ onBack, language, sessionToken, userEmail }: Use
       console.error('Error loading slots:', error);
     }
   };
+
+  // Load upcoming classes on mount
+  const loadUpcomingClasses = async () => {
+    try {
+      setLoadingUpcoming(true);
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/slots/available`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Failed to load upcoming classes');
+        return;
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setUpcomingClasses(data.slots);
+      }
+    } catch (error) {
+      console.error('Error loading upcoming classes:', error);
+    } finally {
+      setLoadingUpcoming(false);
+    }
+  };
+
+  // Load upcoming classes on mount
+  useEffect(() => {
+    loadUpcomingClasses();
+  }, []);
 
   const handleRescheduleClick = async (pkg: PackageDetails) => {
     if (!pkg.firstSession) {
@@ -280,11 +316,25 @@ export function UserDashboard({ onBack, language, sessionToken, userEmail }: Use
                   <h3 className="text-base font-semibold text-[#3d2f28] mb-2">
                     {getPackageDisplayName(pkg.packageType)}
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4 text-[#9ca571]" />
-                    <p className="text-xs text-[#6b5949]">
-                      {pkg.remainingSessions} / {pkg.totalSessions} {t.sessionsRemaining || 'sessions remaining'}
-                    </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-[#9ca571]" />
+                        <p className="text-xs text-[#6b5949]">
+                          {t.used || 'Used'} <span className="font-medium">{pkg.totalSessions - pkg.remainingSessions}</span> {t.of || 'of'} {pkg.totalSessions}
+                        </p>
+                      </div>
+                      <p className="text-xs text-green-600 font-medium">
+                        {pkg.remainingSessions} {t.remaining || 'remaining'}
+                      </p>
+                    </div>
+                    {/* Progress Bar - dark = used, light = remaining */}
+                    <div className="h-2 bg-[#e8e6e3] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#6b5949] transition-all"
+                        style={{ width: `${((pkg.totalSessions - pkg.remainingSessions) / pkg.totalSessions) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -309,12 +359,12 @@ export function UserDashboard({ onBack, language, sessionToken, userEmail }: Use
               </div>
 
               {/* First Session Info */}
-              {pkg.firstSession ? (
+              {pkg.firstSession && (
                 <div className="bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6] rounded-xl p-4 mb-3">
                   <p className="text-xs font-semibold text-[#6b5949] mb-3">
                     {t.firstSession || 'First Session'}
                   </p>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-[#9ca571]" />
@@ -339,24 +389,76 @@ export function UserDashboard({ onBack, language, sessionToken, userEmail }: Use
                     {t.reschedule || 'Reschedule'}
                   </button>
                 </div>
-              ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
-                  <p className="text-xs text-amber-800">
-                    {t.noFirstSessionBooked || 'First session not booked yet'}
-                  </p>
-                </div>
               )}
 
-              {/* Package Info Footer */}
-              <div className="pt-3 border-t border-[#e8e6e3]">
-                <p className="text-xs text-[#8b7764]">
-                  {t.activationCode || 'Activation Code'}: {pkg.activationCodeId || 'Pending'}
-                </p>
-              </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Upcoming Classes Section */}
+      <div className="mt-6">
+        <h2 className="text-base font-semibold text-[#3d2f28] mb-4">
+          {t.upcomingClasses || 'Upcoming Classes'}
+        </h2>
+
+        {loadingUpcoming ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-3 border-[#9ca571] border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : upcomingClasses.length === 0 ? (
+          <div className="text-center py-8 bg-white rounded-2xl border border-[#e8e6e3]">
+            <Calendar className="w-12 h-12 text-[#e8e6e3] mx-auto mb-3" />
+            <p className="text-sm text-[#6b5949]">
+              {t.noUpcomingClasses || 'No upcoming classes available'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {upcomingClasses.map((dateSlot) => (
+              <div key={dateSlot.dateKey} className="bg-white rounded-2xl border border-[#e8e6e3] p-4">
+                <p className="text-sm font-semibold text-[#3d2f28] mb-3">
+                  {dateSlot.displayDate}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {dateSlot.timeSlots.map((timeSlot) => (
+                    <div
+                      key={timeSlot.time}
+                      className={`py-2.5 px-2 rounded-xl text-center ${
+                        timeSlot.available > 0
+                          ? 'bg-gradient-to-br from-[#f5f0ed] to-[#f0ebe6]'
+                          : 'bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Clock className="w-3 h-3 text-[#9ca571]" />
+                        <span className={`text-xs font-medium ${
+                          timeSlot.available > 0 ? 'text-[#3d2f28]' : 'text-gray-400'
+                        }`}>
+                          {timeSlot.time}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] ${
+                        timeSlot.available > 2
+                          ? 'text-green-600'
+                          : timeSlot.available === 2
+                          ? 'text-yellow-600'
+                          : timeSlot.available === 1
+                          ? 'text-orange-600'
+                          : 'text-gray-400'
+                      }`}>
+                        {timeSlot.available > 0
+                          ? `${timeSlot.available} ${t.spotsLeft || 'spots'}`
+                          : t.full || 'Full'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Reschedule Modal */}
       {showRescheduleModal && selectedPackage && (

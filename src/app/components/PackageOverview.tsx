@@ -20,7 +20,6 @@ type FormData = {
 
 type PackageData = {
   packageId: string;
-  activationCode: string;
   packageType: string;
   bonusClasses?: number;
 };
@@ -226,12 +225,10 @@ export function PackageOverview({ onBack, language }: PackageOverviewProps) {
       }
 
       console.log('✅ Package created:', data.packageId);
-      console.log('📧 Activation code sent to email:', formData.email);
 
       // Store package data (including bonusClasses from coupon)
       setPackageData({
         packageId: data.packageId,
-        activationCode: data.activationCode,
         packageType: packageType,
         bonusClasses: data.bonusClasses || 0,
       });
@@ -415,8 +412,6 @@ console.log('✅ Package & first session booked successfully!');
       } else {
         console.log('📧 Registration email sent by server to:', formData.email);
       }
-      
-      console.log('🎟️ Activation code (admin will send later):', data.package?.activationCodeId);
 
       // Show success with detailed info
       setSuccessData({
@@ -426,7 +421,6 @@ console.log('✅ Package & first session booked successfully!');
           time: timeSlot,
         },
         remainingSessions: data.package?.remainingSessions || 0,
-        activationCode: data.package?.activationCodeId,
         isPreviewMode: data.isPreviewMode,
         previewRegistrationLink: data.previewRegistrationLink,
       });
@@ -483,7 +477,6 @@ console.log('✅ Package & first session booked successfully!');
     // Show final success with package info only
     setSuccessData({
       packageType: packageData?.packageType,
-      activationCode: packageData?.activationCode,
       skippedFirstSession: true,
     });
 
@@ -646,9 +639,9 @@ console.log('✅ Package & first session booked successfully!');
               </div>
             ) : (
               <p className="text-sm text-[#6b5949] mb-5 leading-relaxed">
-                {successData?.skippedFirstSession 
+                {successData?.skippedFirstSession
                   ? (t.packageSavedDesc || 'Your package has been saved. Please visit the studio to complete payment and book your first session.')
-                  : (t.bookingConfirmedDesc || 'Check your email to complete registration. The activation code will be sent by admin after payment confirmation.')}
+                  : (t.bookingConfirmedDesc || 'Check your email to complete registration. Your account will be activated by admin after payment confirmation.')}
               </p>
             )}
             

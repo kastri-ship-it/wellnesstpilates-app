@@ -35,7 +35,6 @@ async function ensureUsersTable() {
           remaining_sessions INTEGER DEFAULT 0,
           gifted_sessions INTEGER DEFAULT 0,
           payment_status TEXT DEFAULT 'unpaid',
-          activation_code TEXT,
           activation_status TEXT DEFAULT 'pending',
           activated_at TIMESTAMPTZ,
           package_expiry_date TIMESTAMPTZ,
@@ -158,7 +157,6 @@ async function saveReservationToSupabase(reservationData: {
   date_key: string;
   time_slot: string;
   end_time?: string;
-  instructor?: string;
   service_type?: string;
   package_type?: string;
   reservation_status?: string;
@@ -184,7 +182,6 @@ async function saveReservationToSupabase(reservationData: {
       date_key: reservationData.date_key,
       time_slot: reservationData.time_slot,
       end_time: reservationData.end_time,
-      instructor: reservationData.instructor || 'Rina',
       service_type: reservationData.service_type || 'single',
       package_type: reservationData.package_type,
       reservation_status: reservationData.reservation_status || 'pending',
@@ -344,7 +341,7 @@ const VALID_PACKAGE_TYPES = [
 ];
 
 const PACKAGE_PRICING = {
-  single: { price: 500, label: 'Single Session', description: '500 DEN per session' },
+  single: { price: 600, label: 'Single Session', description: '600 DEN per session' },
   package8: { price: 3500, label: '8 Classes Package', description: '438 DEN per session' },
   package10: { price: 4200, label: '10 Classes Package', description: '420 DEN per session' },
   package12: { price: 4800, label: '12 Classes Package', description: '400 DEN per session' },
@@ -469,16 +466,6 @@ function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
 
-function generateActivationCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'WN-';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-    if (i === 3) code += '-';
-  }
-  return code;
-}
-
 function extractServiceType(packageType: PackageType): ServiceType {
   if (packageType === 'single') return 'single';
   if (packageType.startsWith('individual')) return 'individual';
@@ -496,7 +483,7 @@ function extractSessionCount(packageType: PackageType): number {
 // Date-specific session durations (in minutes)
 const DATE_SPECIFIC_DURATIONS: Record<string, number> = {
   '1-29': 50,  // January 29: 50 min sessions
-  '1-30': 45,  // January 30: 45 min sessions
+  '1-30': 50,  // January 30: 50 min sessions
 };
 
 function calculateEndTime(startTime: string, dateKey?: string): string {
@@ -678,125 +665,6 @@ async function sendEmail(to: string, subject: string, htmlContent: string, langu
     console.error('❌ Email error:', error);
     return { success: false, error: error.message };
   }
-}
-
-async function sendActivationEmail(
-  email: string,
-  name: string,
-  surname: string,
-  activationCode: string,
-  packageType: PackageType,
-  firstSessionDetails?: {
-    date: string;
-    timeSlot: string;
-    endTime: string;
-    instructor: string;
-  },
-  language: string = 'EN'
-) {
-  const lang = (language?.toUpperCase() || 'EN') as keyof typeof EMAIL_TRANSLATIONS;
-  const t = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS.EN;
-  const { price, label: packageName } = getPackagePriceInfo(packageType);
-  const sessionCount = extractSessionCount(packageType);
-
-  const title = lang === 'SQ' ? 'Aktivizo Paketën' : lang === 'MK' ? 'Активирајте Пакет' : 'Activate Your Package';
-  const message = lang === 'SQ' ? `Faleminderit që zgjodhët ${STUDIO_INFO.name}! Paketa juaj ${packageName} është gati për aktivizim.`
-    : lang === 'MK' ? `Ви благодариме што го избравте ${STUDIO_INFO.name}! Вашиот пакет ${packageName} е подготвен за активирање.`
-    : `Thank you for choosing ${STUDIO_INFO.name}! Your ${packageName} package is ready to be activated.`;
-  const activationCodeLabel = lang === 'SQ' ? 'KODI I AKTIVIZIMIT' : lang === 'MK' ? 'КОД ЗА АКТИВИРАЊЕ' : 'ACTIVATION CODE';
-  const packageLabel = lang === 'SQ' ? 'PAKETA' : lang === 'MK' ? 'ПАКЕТ' : 'PACKAGE';
-  const priceLabel = lang === 'SQ' ? 'ÇMIMI' : lang === 'MK' ? 'ЦЕНА' : 'PRICE';
-  const firstClassLabel = lang === 'SQ' ? 'KLASA E PARË' : lang === 'MK' ? 'ПРВ ЧАС' : 'FIRST CLASS';
-  const howToActivateTitle = lang === 'SQ' ? 'Si të aktivizoni' : lang === 'MK' ? 'Како да активирате' : 'How to activate';
-  const step1 = lang === 'SQ' ? `Hapni aplikacionin e ${STUDIO_INFO.name}` : lang === 'MK' ? `Отворете ја апликацијата на ${STUDIO_INFO.name}` : `Open the ${STUDIO_INFO.name} booking app`;
-  const step2 = lang === 'SQ' ? 'Klikoni "Hyrja e Anëtarëve"' : lang === 'MK' ? 'Кликнете "Најава на Членови"' : 'Click "Member Login"';
-  const step3 = lang === 'SQ' ? 'Vendosni emailin dhe kodin e aktivizimit' : lang === 'MK' ? 'Внесете го емаилот и кодот за активирање' : 'Enter your email and activation code';
-  const regards = lang === 'SQ' ? 'Me respekt,' : lang === 'MK' ? 'Со почит,' : 'Best regards,';
-
-  // First session details rows if available
-  const firstSessionRows = firstSessionDetails ? `
-            <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
-                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${firstClassLabel}</span>
-              </td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
-                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${firstSessionDetails.date}, ${firstSessionDetails.timeSlot}</span>
-              </td>
-            </tr>` : '';
-
-  const content = `
-    <h1 style="color: #452F21; font-size: 24px; margin-bottom: 20px; text-align: center; font-family: Georgia, 'Times New Roman', serif;">
-      ${title}
-    </h1>
-
-    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
-      ${t.greeting}, ${name}${surname ? ' ' + surname : ''}
-    </p>
-
-    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-bottom: 15px; font-family: Georgia, 'Times New Roman', serif;">
-      ${message}
-    </p>
-
-    <!-- ACTIVATION CODE BOX -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #452F21; border-radius: 8px; margin: 25px 0;">
-      <tr>
-        <td style="padding: 25px; text-align: center;">
-          <p style="margin: 0 0 5px 0; color: #ffffff; font-size: 12px; opacity: 0.8; font-family: Georgia, 'Times New Roman', serif;">${activationCodeLabel}</p>
-          <p style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; font-family: Georgia, 'Times New Roman', serif;">${activationCode}</p>
-        </td>
-      </tr>
-    </table>
-
-    <!-- DETAILS BOX -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f0ed; border-radius: 8px; margin: 25px 0;">
-      <tr>
-        <td style="padding: 20px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
-                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${packageLabel}</span>
-              </td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
-                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${packageName}</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8;">
-                <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${priceLabel}</span>
-              </td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #e8dfd8; text-align: right;">
-                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">${price} DEN</span>
-              </td>
-            </tr>
-            ${firstSessionRows}
-          </table>
-        </td>
-      </tr>
-    </table>
-
-    <!-- NOTE BOX - How to Activate -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff8f0; border-radius: 8px; margin: 25px 0; border-left: 4px solid #9ca571;">
-      <tr>
-        <td style="padding: 20px;">
-          <p style="margin: 0 0 10px 0; font-weight: bold; color: #452F21; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${howToActivateTitle}</p>
-          <p style="margin: 5px 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">1. ${step1}</p>
-          <p style="margin: 5px 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">2. ${step2}</p>
-          <p style="margin: 5px 0; color: #6b5949; font-size: 14px; line-height: 1.6; font-family: Georgia, 'Times New Roman', serif;">3. ${step3}</p>
-        </td>
-      </tr>
-    </table>
-
-    <p style="color: #6b5949; font-size: 16px; line-height: 1.6; margin-top: 25px; font-family: Georgia, 'Times New Roman', serif;">
-      ${regards}<br>
-      <strong style="color: #452F21;">Ekipi i WellNest Pilates</strong>
-    </p>
-  `;
-
-  const subject = lang === 'SQ' ? `Aktivizo Paketën - ${STUDIO_INFO.name}`
-    : lang === 'MK' ? `Активирајте Пакет - ${STUDIO_INFO.name}`
-    : `Activate Your Package - ${STUDIO_INFO.name}`;
-
-  return sendEmail(email, subject, content, language);
 }
 
 async function sendRegistrationEmail(
@@ -999,7 +867,7 @@ async function sendSingleSessionEmail(email: string, name: string, dateKey: stri
                 <span style="color: #6b5949; font-size: 14px; font-family: Georgia, 'Times New Roman', serif;">${priceLabel}</span>
               </td>
               <td style="padding: 8px 0; text-align: right;">
-                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">350 DEN</span>
+                <span style="color: #452F21; font-size: 14px; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">600 DEN</span>
               </td>
             </tr>
           </table>
@@ -1659,10 +1527,10 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
   try {
     const packageId = c.req.param('id');
     const body = await c.req.json();
-    const { dateKey, timeSlot, instructor, partnerName, partnerSurname, appUrl } = body;
+    const { dateKey, timeSlot, partnerName, partnerSurname, appUrl } = body;
 
-    if (!dateKey || !timeSlot || !instructor) {
-      return c.json({ error: "Missing required fields: dateKey, timeSlot, instructor" }, 400);
+    if (!dateKey || !timeSlot) {
+      return c.json({ error: "Missing required fields: dateKey, timeSlot" }, 400);
     }
 
     if (!appUrl) {
@@ -1718,7 +1586,7 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
       fullDate,
       timeSlot,
       endTime,
-      instructor,
+      instructor: null,
       name: pkg.name,
       surname: pkg.surname,
       email: pkg.email,
@@ -1775,7 +1643,6 @@ app.post("/make-server-b87b0c07/packages/:id/first-session", async (c) => {
       date_key: dateKey,
       time_slot: timeSlot,
       end_time: endTime,
-      instructor,
       service_type: serviceType,
       package_type: pkg.packageType,
       reservation_status: 'pending',
@@ -1859,7 +1726,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       serviceType,
       dateKey,
       timeSlot,
-      instructor,
       name,
       surname,
       email,
@@ -1869,7 +1735,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       language
     } = body;
 
-    if (!userId || !serviceType || !dateKey || !timeSlot || !instructor) {
+    if (!userId || !serviceType || !dateKey || !timeSlot) {
       return c.json({ error: "Missing required fields" }, 400);
     }
 
@@ -1957,7 +1823,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       fullDate,
       timeSlot,
       endTime,
-      instructor,
+      instructor: null,
       name,
       surname,
       email: normalizedEmail,
@@ -2017,7 +1883,6 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
         date_key: dateKey,
         time_slot: timeSlot,
         end_time: endTime,
-        instructor,
         service_type: serviceType,
         package_type: pkg.packageType,
         reservation_status: 'confirmed',
@@ -2048,28 +1913,10 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
       });
 
     } else {
-      const activationCode = generateActivationCode();
-      const codeKey = `activation_code:${activationCode}`;
-      const codeExpiry = new Date();
-      codeExpiry.setHours(codeExpiry.getHours() + 24);
-
-      const activationCodeData = {
-        id: codeKey,
-        code: activationCode,
-        email: normalizedEmail,
-        packageId: null,
-        reservationId,
-        status: 'active',
-        expiresAt: codeExpiry.toISOString(),
-        usedAt: null,
-        createdAt: new Date().toISOString()
-      };
-
-      await kv.set(codeKey, activationCodeData);
-
+      // New user - create user and send registration email
       const userKey = `user:${normalizedEmail}`;
       let user = await kv.get(userKey);
-      
+
       if (!user) {
         user = {
           id: userKey,
@@ -2087,24 +1934,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
         console.log(`User created for single session booking: ${normalizedEmail}`);
       }
 
-      try {
-        await sendActivationEmail(
-          normalizedEmail,
-          name,
-          surname,
-          activationCode,
-          'single',
-          {
-            date: dateString,
-            timeSlot,
-            endTime,
-            instructor
-          }
-        );
-      } catch (emailError) {
-        console.error('Failed to send activation email:', emailError);
-      }
-
+      // Send registration email for new users to set password
       try {
         if (!user || !user.passwordHash) {
           const verificationToken = `verify_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
@@ -2131,7 +1961,7 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
           }
 
           const appUrl = c.req.header('origin') || c.req.header('referer') || 'https://app.wellnest-pilates.com';
-          
+
           await sendRegistrationEmail(
             normalizedEmail,
             name,
@@ -2151,15 +1981,14 @@ app.post("/make-server-b87b0c07/reservations", async (c) => {
         console.error('Error sending registration email:', emailError);
       }
 
-      console.log(`Single session reserved: ${reservationId}, activation code: ${activationCode}`);
+      console.log(`Single session reserved: ${reservationId}`);
 
       return c.json({
         success: true,
         reservation,
         reservationId,
-        requiresActivation: true,
-        activationCode,
-        message: "Reservation created! Check your email for activation code and registration link."
+        requiresActivation: false,
+        message: "Reservation created! Check your email to complete registration."
       });
     }
 
@@ -2428,7 +2257,7 @@ app.get("/make-server-b87b0c07/admin/users", async (c: any) => {
         // Calculate session info from user record
         const totalSessions = user.total_sessions || 0;
         const usedSessions = user.used_sessions || 0;
-        const remainingSessions = user.remaining_sessions || (totalSessions - usedSessions);
+        const remainingSessions = user.remaining_sessions ?? (totalSessions - usedSessions);
 
         return {
           id: user.id,
@@ -2655,17 +2484,6 @@ app.patch("/make-server-b87b0c07/admin/users/:email/payment", async (c) => {
   }
 });
 
-// Resend activation code email for a user
-// DEPRECATED: Activation codes are no longer used
-app.post("/make-server-b87b0c07/admin/resend-activation-code", async (c) => {
-  console.warn('DEPRECATED: /admin/resend-activation-code endpoint called - activation codes are no longer used');
-  return c.json({
-    error: "Activation codes are no longer used",
-    message: "Package activation is now handled directly by the 'Activate' button in the admin panel.",
-    deprecated: true
-  }, 410);
-});
-
 // Admin activate package - generate password and send credentials
 // This is the ONLY way to activate a package and generate credentials
 app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
@@ -2679,11 +2497,42 @@ app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
 
     const normalizedEmail = normalizeEmail(email);
 
-    // Get user
+    // Get user - check KV first, then Supabase
     const userKey = `user:${normalizedEmail}`;
-    const user = await kv.get(userKey);
+    let user = await kv.get(userKey);
+
+    // If not in KV, check Supabase and create in KV
     if (!user) {
-      return c.json({ error: "User not found" }, 404);
+      console.log(`User not in KV, checking Supabase: ${normalizedEmail}`);
+      const supabase = getSupabase();
+      const { data: supabaseUser, error: supabaseError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .single();
+
+      if (supabaseError || !supabaseUser) {
+        console.log(`User not found in Supabase either: ${normalizedEmail}`);
+        return c.json({ error: "User not found" }, 404);
+      }
+
+      // Create user in KV from Supabase data
+      user = {
+        id: `user:${normalizedEmail}`,
+        email: normalizedEmail,
+        name: supabaseUser.name,
+        surname: supabaseUser.surname,
+        mobile: supabaseUser.mobile,
+        packageType: supabaseUser.package_type,
+        totalSessions: supabaseUser.total_sessions || 0,
+        remainingSessions: supabaseUser.remaining_sessions ?? (supabaseUser.total_sessions || 0),
+        paymentStatus: supabaseUser.payment_status || 'unpaid',
+        language: supabaseUser.language || 'EN',
+        createdAt: supabaseUser.created_at,
+        updatedAt: new Date().toISOString()
+      };
+      await kv.set(userKey, user);
+      console.log(`User synced from Supabase to KV: ${normalizedEmail}`);
     }
 
     // Find the package to activate
@@ -2790,6 +2639,39 @@ app.post("/make-server-b87b0c07/admin/activate-package", async (c) => {
         language: language
       });
       console.log(`✅ User synced to Supabase after activation: ${normalizedEmail}`);
+    } else {
+      // No package found - just update user's payment status in Supabase
+      console.log(`No package found for ${normalizedEmail}, updating payment status only`);
+      await saveUserToSupabase({
+        email: normalizedEmail,
+        name: user.name,
+        surname: user.surname,
+        mobile: user.mobile,
+        package_type: user.packageType || 'single',
+        total_sessions: user.totalSessions || 1,
+        remaining_sessions: user.remainingSessions ?? (user.totalSessions || 1),
+        payment_status: 'paid',
+        language: language
+      });
+      console.log(`✅ User payment status updated in Supabase: ${normalizedEmail}`);
+
+      // Also update all pending reservations for this user in Supabase
+      const supabase = getSupabase();
+      const { error: resUpdateError } = await supabase
+        .from('reservations')
+        .update({
+          payment_status: 'paid',
+          reservation_status: 'confirmed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_email', normalizedEmail)
+        .eq('reservation_status', 'pending');
+
+      if (resUpdateError) {
+        console.error('Error updating reservations in Supabase:', resUpdateError);
+      } else {
+        console.log(`✅ Reservations updated to paid/confirmed for: ${normalizedEmail}`);
+      }
     }
 
     // Send email with login credentials
@@ -2853,14 +2735,14 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
     }
 
     console.log('📥 Parsed body:', JSON.stringify(body));
-    const { dateKey, timeSlot, instructor, name, surname, email, mobile, language, selectedPackage } = body;
+    const { dateKey, timeSlot, name, surname, email, mobile, language, selectedPackage } = body;
     // NOTE: bonusClasses intentionally NOT accepted from client (fraud prevention)
     // Legacy endpoint does not support coupons - use /packages endpoint for coupon support
 
-    console.log('📋 Extracted fields:', { dateKey, timeSlot, instructor, name, surname, email, mobile });
+    console.log('📋 Extracted fields:', { dateKey, timeSlot, name, surname, email, mobile });
 
-    if (!dateKey || !timeSlot || !instructor || !name || !surname || !email || !mobile) {
-      console.log('❌ Missing fields check failed:', { dateKey: !!dateKey, timeSlot: !!timeSlot, instructor: !!instructor, name: !!name, surname: !!surname, email: !!email, mobile: !!mobile });
+    if (!dateKey || !timeSlot || !name || !surname || !email || !mobile) {
+      console.log('❌ Missing fields check failed:', { dateKey: !!dateKey, timeSlot: !!timeSlot, name: !!name, surname: !!surname, email: !!email, mobile: !!mobile });
       return c.json({ error: "Missing required fields", receivedFields: Object.keys(body) }, 400);
     }
 
@@ -2921,7 +2803,7 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
       fullDate,
       timeSlot,
       endTime,
-      instructor,
+      instructor: null,
       name,
       surname,
       email: normalizedEmail,
@@ -2968,7 +2850,6 @@ app.post("/make-server-b87b0c07/bookings", async (c) => {
       date_key: dateKey,
       time_slot: timeSlot,
       end_time: endTime,
-      instructor,
       service_type: selectedPackage ? 'package' : 'single',
       package_type: selectedPackage,
       reservation_status: 'confirmed',
@@ -3114,7 +2995,7 @@ app.post("/make-server-b87b0c07/migrate-bookings", async (c) => {
             fullDate: constructFullDate(booking.dateKey, booking.timeSlot),
             timeSlot: booking.timeSlot,
             endTime: calculateEndTime(booking.timeSlot),
-            instructor: booking.instructor || 'Rina Krasniqi',
+            instructor: null,
             name: booking.name,
             surname: booking.surname,
             email: normalizeEmail(booking.email),
@@ -3263,7 +3144,6 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c: any) => {
         dateKey: res.date_key,
         timeSlot: res.time_slot,
         endTime: res.end_time,
-        instructor: res.instructor,
         serviceType: res.service_type,
         packageType: res.package_type,
         reservationStatus: res.reservation_status,
@@ -3316,7 +3196,7 @@ app.get("/make-server-b87b0c07/admin/calendar", async (c: any) => {
 
 app.post("/make-server-b87b0c07/dev/clear-all-data", async (c) => {
   try {
-    const prefixes = ['user:', 'package:', 'reservation:', 'activation_code:', 'verification_token:', 'session:', 'orphaned_package:', 'booking:', 'payment:'];
+    const prefixes = ['user:', 'package:', 'reservation:', 'verification_token:', 'session:', 'orphaned_package:', 'booking:', 'payment:'];
     
     let totalDeleted = 0;
     for (const prefix of prefixes) {
@@ -3575,6 +3455,92 @@ app.post("/make-server-b87b0c07/auth/logout", async (c) => {
 
 // ============ USER ENDPOINTS ============
 
+// Get available slots for the next 2 weekdays
+app.get("/make-server-b87b0c07/slots/available", async (c) => {
+  try {
+    const supabase = getSupabase();
+
+    // Generate next 2 weekdays
+    const dates: { date: Date; dateKey: string; displayDate: string }[] = [];
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
+    let weekdaysFound = 0;
+    const maxDaysToCheck = 10;
+    let daysChecked = 0;
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    while (weekdaysFound < 2 && daysChecked < maxDaysToCheck) {
+      const dayOfWeek = currentDate.getDay();
+
+      // Only include weekdays (Monday to Friday)
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        const day = currentDate.getDate();
+        const month = currentDate.getMonth();
+        const dateKey = `${month + 1}-${day}`;
+
+        dates.push({
+          date: new Date(currentDate),
+          dateKey,
+          displayDate: `${dayNames[dayOfWeek]}, ${day} ${monthNames[month]}`,
+        });
+
+        weekdaysFound++;
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1);
+      daysChecked++;
+    }
+
+    // Get all reservations from Supabase for these dates
+    const dateKeys = dates.map(d => d.dateKey);
+    const { data: reservations, error } = await supabase
+      .from('reservations')
+      .select('*')
+      .in('date_key', dateKeys)
+      .in('reservation_status', ['pending', 'confirmed']);
+
+    if (error) {
+      console.error('Error fetching reservations:', error);
+    }
+
+    // Build slots for each date
+    const slots = dates.map(dateInfo => {
+      const timeSlots = getTimeSlotsForDate(dateInfo.dateKey);
+      const dateReservations = (reservations || []).filter((r: any) => r.date_key === dateInfo.dateKey);
+
+      return {
+        date: dateInfo.date,
+        dateKey: dateInfo.dateKey,
+        displayDate: dateInfo.displayDate,
+        timeSlots: timeSlots.map(time => {
+          const slotReservations = dateReservations.filter((r: any) => r.time_slot === time);
+          const bookedCount = slotReservations.length;
+          const available = Math.max(0, 4 - bookedCount);
+
+          return {
+            time,
+            endTime: calculateEndTime(time, dateInfo.dateKey),
+            available,
+            isBooked: false,
+          };
+        }),
+      };
+    });
+
+    return c.json({
+      success: true,
+      slots,
+    });
+
+  } catch (error) {
+    console.error('Error getting available slots:', error);
+    return c.json({ error: 'Failed to get available slots', details: (error as Error).message }, 500);
+  }
+});
+
 app.get("/make-server-b87b0c07/user/packages", async (c) => {
   try {
     const sessionToken = c.req.header('X-Session-Token');
@@ -3590,19 +3556,114 @@ app.get("/make-server-b87b0c07/user/packages", async (c) => {
       return c.json({ error: "Invalid or expired session" }, 401);
     }
 
-    const allPackages = await kv.getByPrefix(`package:${session.email}:`);
+    const userEmail = session.email;
+
+    // Try to get packages from KV first
+    let allPackages = await kv.getByPrefix(`package:${userEmail}:`);
     const allReservations = await kv.getByPrefix('reservation:');
-    const userReservations = allReservations.filter((r: any) => r.userId === session.email);
+    let userReservations = allReservations.filter((r: any) => r.userId === userEmail);
+
+    // If no packages in KV, check Supabase and build package from user data
+    if (allPackages.length === 0) {
+      console.log(`No KV packages for ${userEmail}, checking Supabase...`);
+      const supabase = getSupabase();
+
+      // Get user data from Supabase
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .single();
+
+      // Get reservations from Supabase
+      const { data: supabaseReservations, error: resError } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('user_email', userEmail)
+        .order('created_at', { ascending: false });
+
+      if (userData && !userError) {
+        // Build a virtual package from Supabase user data
+        const virtualPackage = {
+          id: `package:${userEmail}:virtual`,
+          userId: userEmail,
+          email: userEmail,
+          name: userData.name,
+          surname: userData.surname,
+          packageType: userData.package_type || 'single',
+          totalSessions: userData.total_sessions || 1,
+          remainingSessions: userData.remaining_sessions ?? (userData.total_sessions || 1),
+          usedSessions: userData.used_sessions || 0,
+          packageStatus: userData.payment_status === 'paid' ? 'active' : 'pending',
+          paymentStatus: userData.payment_status || 'unpaid',
+          createdAt: userData.created_at,
+          updatedAt: userData.updated_at,
+          // Include first reservation if exists
+          firstReservationId: supabaseReservations?.[0]?.id || null
+        };
+
+        allPackages = [virtualPackage];
+        console.log(`Built virtual package from Supabase for ${userEmail}:`, virtualPackage);
+
+        // Convert Supabase reservations to expected format
+        if (supabaseReservations && supabaseReservations.length > 0) {
+          userReservations = supabaseReservations.map((res: any) => ({
+            id: res.id,
+            userId: res.user_email,
+            email: res.user_email,
+            name: res.name,
+            surname: res.surname,
+            dateKey: res.date_key,
+            timeSlot: res.time_slot,
+            reservationStatus: res.reservation_status,
+            paymentStatus: res.payment_status,
+            packageType: res.package_type,
+            createdAt: res.created_at
+          }));
+          console.log(`Loaded ${userReservations.length} reservations from Supabase`);
+        }
+      }
+    }
+
+    // Build packages with firstSession embedded
+    const packagesWithFirstSession = allPackages.map((pkg: any) => {
+      // Find the first reservation for this package/user
+      const firstRes = userReservations.find((r: any) =>
+        r.packageId === pkg.id || r.userId === pkg.userId
+      ) || userReservations[0]; // fallback to first reservation
+
+      let firstSession = null;
+      if (firstRes) {
+        // Format dateKey to readable date
+        const [month, day] = (firstRes.dateKey || '').split('-');
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const formattedDate = month && day ? `${day} ${monthNames[parseInt(month) - 1]} 2026` : '';
+
+        firstSession = {
+          id: firstRes.id,
+          date: formattedDate,
+          dateKey: firstRes.dateKey,
+          time: firstRes.timeSlot,
+          endTime: calculateEndTime(firstRes.timeSlot, firstRes.dateKey)
+        };
+      }
+
+      return {
+        ...pkg,
+        firstSession,
+        sessionsBooked: userReservations.map((r: any) => r.id)
+      };
+    });
 
     return c.json({
       success: true,
-      packages: allPackages,
+      packages: packagesWithFirstSession,
       reservations: userReservations
     });
 
   } catch (error) {
     console.error('Error fetching user packages:', error);
-    return c.json({ error: 'Failed to fetch packages', details: error.message }, 500);
+    return c.json({ error: 'Failed to fetch packages', details: (error as Error).message }, 500);
   }
 });
 
@@ -3610,9 +3671,9 @@ app.post("/make-server-b87b0c07/user/packages/:id/reschedule", async (c) => {
   try {
     const packageId = c.req.param('id');
     const body = await c.req.json();
-    const { dateKey, timeSlot, instructor } = body;
+    const { dateKey, timeSlot } = body;
 
-    if (!dateKey || !timeSlot || !instructor) {
+    if (!dateKey || !timeSlot) {
       return c.json({ error: "Missing required fields" }, 400);
     }
 
@@ -3658,7 +3719,6 @@ app.post("/make-server-b87b0c07/user/packages/:id/reschedule", async (c) => {
     firstReservation.fullDate = fullDate;
     firstReservation.timeSlot = timeSlot;
     firstReservation.endTime = endTime;
-    firstReservation.instructor = instructor;
     firstReservation.updatedAt = new Date().toISOString();
 
     await kv.set(pkg.firstReservationId, firstReservation);
@@ -4223,7 +4283,7 @@ app.get("/make-server-b87b0c07/waitlist/verify/:code", async (c) => {
 // Redeem waitlist offer (purchase 8-pack with free first session)
 app.post("/make-server-b87b0c07/waitlist/redeem", async (c) => {
   try {
-    const { code, dateKey, timeSlot, instructor = 'Besa' } = await c.req.json();
+    const { code, dateKey, timeSlot } = await c.req.json();
 
     if (!code || !dateKey || !timeSlot) {
       return c.json({ error: 'Missing required fields' }, 400);
@@ -4301,7 +4361,7 @@ app.post("/make-server-b87b0c07/waitlist/redeem", async (c) => {
       fullDate,
       timeSlot,
       endTime,
-      instructor,
+      instructor: null,
       name,
       surname,
       email: normalizedEmail,
@@ -4603,7 +4663,7 @@ app.get("/make-server-b87b0c07/admin/dashboard", async (c) => {
     const pendingCount = totalBookings - paidCount;
 
     // Estimate revenue (simplified)
-    const estimatedRevenue = paidCount * 500; // Base per-session price
+    const estimatedRevenue = paidCount * 600; // Base per-session price
 
     // Get all users for total count
     const allUsers = await kv.getByPrefix('user:');
@@ -4912,6 +4972,70 @@ app.post("/make-server-b87b0c07/admin/users/:email/block", async (c) => {
   }
 });
 
+// Delete a user completely
+app.delete("/make-server-b87b0c07/admin/users/:email", async (c) => {
+  try {
+    const email = decodeURIComponent(c.req.param('email'));
+    const normalizedEmail = email.toLowerCase().trim();
+
+    console.log(`🗑️ Deleting user: ${normalizedEmail}`);
+
+    const supabase = getSupabase();
+
+    // Delete from users table
+    const { error: userError } = await supabase
+      .from('users')
+      .delete()
+      .eq('email', normalizedEmail);
+
+    if (userError) {
+      console.error('Error deleting user from Supabase:', userError);
+    }
+
+    // Delete from reservations table
+    const { error: resError } = await supabase
+      .from('reservations')
+      .delete()
+      .eq('user_email', normalizedEmail);
+
+    if (resError) {
+      console.error('Error deleting reservations from Supabase:', resError);
+    }
+
+    // Delete from KV store
+    const userKey = `user:${normalizedEmail}`;
+    await kv.del(userKey);
+
+    // Delete user's packages from KV
+    const allPackages = await kv.getByPrefix('package:');
+    for (const pkg of allPackages) {
+      if (pkg.userId === normalizedEmail || pkg.email === normalizedEmail) {
+        await kv.del(pkg.id);
+        console.log(`Deleted package: ${pkg.id}`);
+      }
+    }
+
+    // Delete user's reservations from KV
+    const allReservations = await kv.getByPrefix('reservation:');
+    for (const res of allReservations) {
+      if (res.userId === normalizedEmail || res.email === normalizedEmail) {
+        await kv.del(res.id);
+        console.log(`Deleted reservation: ${res.id}`);
+      }
+    }
+
+    console.log(`✅ User ${normalizedEmail} deleted successfully`);
+
+    return c.json({
+      success: true,
+      message: `User ${normalizedEmail} deleted successfully`,
+    });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return c.json({ error: 'Failed to delete user', details: (error as Error).message }, 500);
+  }
+});
+
 // ============ AUDIT LOG ENDPOINT ============
 
 app.get("/make-server-b87b0c07/admin/audit", async (c) => {
@@ -5013,7 +5137,6 @@ CREATE TABLE IF NOT EXISTS users (
   remaining_sessions INTEGER DEFAULT 0,
   gifted_sessions INTEGER DEFAULT 0,
   payment_status TEXT DEFAULT 'unpaid',
-  activation_code TEXT,
   activation_status TEXT DEFAULT 'pending',
   activated_at TIMESTAMPTZ,
   package_expiry_date TIMESTAMPTZ,
@@ -5033,7 +5156,6 @@ CREATE TABLE IF NOT EXISTS reservations (
   date_key TEXT NOT NULL,
   time_slot TEXT NOT NULL,
   end_time TEXT,
-  instructor TEXT DEFAULT 'Rina',
   service_type TEXT DEFAULT 'single',
   package_type TEXT,
   session_number INTEGER,

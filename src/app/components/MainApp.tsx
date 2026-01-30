@@ -8,7 +8,6 @@ import { IndividualTraining } from './IndividualTraining';
 import { DuoTraining } from './DuoTraining';
 import { ConfirmationScreen } from './ConfirmationScreen';
 import { SuccessScreen } from './SuccessScreen';
-import { InstructorProfile } from './InstructorProfile';
 import { LoginRegisterModal } from './LoginRegisterModal';
 import { UserDashboard } from './UserDashboard';
 import { AdminLogin } from './AdminLogin';
@@ -23,7 +22,6 @@ type Screen =
   | { type: 'duo' }
   | { type: 'confirmation'; bookingData: any }
   | { type: 'success'; bookingData: any }
-  | { type: 'instructorProfile'; instructorName: string }
   | { type: 'userDashboard'; userEmail: string; userName: string; userSurname: string; userPackage: string | null; sessionsRemaining: number }
   | { type: 'adminLogin' }
   | { type: 'adminPanel' };
@@ -97,10 +95,6 @@ export function MainApp() {
 
   const handleBookingComplete = () => {
     setBookingRefreshKey(prev => prev + 1);
-  };
-
-  const handleInstructorClick = (instructorName: string) => {
-    setScreen({ type: 'instructorProfile', instructorName });
   };
 
   const handleBack = () => {
@@ -221,7 +215,6 @@ export function MainApp() {
           trainingType={screen.trainingType}
           onBack={handleBack}
           onSubmit={handleBookingSubmit}
-          onInstructorClick={handleInstructorClick}
           language={language}
           refreshKey={bookingRefreshKey}
         />
@@ -278,10 +271,6 @@ export function MainApp() {
           onBack={handleSuccessBack}
           language={language}
         />
-      )}
-
-      {screen.type === 'instructorProfile' && (
-        <InstructorProfile instructorName={screen.instructorName} onBack={handleBack} language={language} />
       )}
 
       {screen.type === 'userDashboard' && (

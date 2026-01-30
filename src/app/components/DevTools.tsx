@@ -148,7 +148,6 @@ export function DevTools({ onClose }: DevToolsProps) {
         const details = [
           cleared.reservations && `${cleared.reservations} reservations`,
           cleared.packages && `${cleared.packages} packages`,
-          cleared.activationCodes && `${cleared.activationCodes} codes`,
           cleared.orphanedPackages && `${cleared.orphanedPackages} orphaned`,
           cleared.bookings && `${cleared.bookings} legacy bookings`,
           cleared.members && `${cleared.members} legacy members`
@@ -279,7 +278,7 @@ export function DevTools({ onClose }: DevToolsProps) {
           <div className="bg-[#f5f0ed] rounded-lg p-4">
             <h3 className="text-sm font-semibold text-[#3d2f28] mb-2">Clear All Data</h3>
             <p className="text-xs text-[#8b7764] mb-3">
-              Deletes all reservations, packages, activation codes, and legacy bookings from the database.
+              Deletes all reservations, packages, and legacy bookings from the database.
             </p>
             <button
               onClick={clearAllData}

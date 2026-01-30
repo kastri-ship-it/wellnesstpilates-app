@@ -27,8 +27,6 @@ export type User = {
     purchasedDate: string;
     activatedDate?: string;
   }>;
-  codeSentAt?: string; // When the activation code was sent
-  activationCode?: string; // The unique activation code (e.g., "WN-XXXX-XXXX")
 };
 
 export type Booking = {
@@ -40,7 +38,6 @@ export type Booking = {
   date: string;
   dateKey: string;
   timeSlot: string;
-  instructor: string;
   selectedPackage?: 'package8' | 'package10' | 'package12';
   payInStudio: boolean;
   language: string;
@@ -84,11 +81,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [bookings, setBookings] = useState<Booking[]>(mockBookings);
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedActivationCode, setSelectedActivationCode] = useState<'PILATES8' | 'PILATES12' | 'WELLNEST2025'>('WELLNEST2025');
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [emailStatus, setEmailStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [showGiftModal, setShowGiftModal] = useState(false);
@@ -161,6 +154,20 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       const formattedUsers: User[] = usersData.users.map((user: any) => {
         const status = user.paymentStatus === 'paid' ? 'confirmed' : 'pending';
         console.log(`User ${user.email}: paymentStatus=${user.paymentStatus}, mapped status=${status}`);
+
+        // Get first reservation's date/time info
+        const firstReservation = user.reservations?.[0];
+        let bookingDate: string | undefined;
+        let bookingTime: string | undefined;
+
+        if (firstReservation?.dateKey && firstReservation?.timeSlot) {
+          // Format dateKey (e.g., "1-30") to readable date
+          const [month, day] = firstReservation.dateKey.split('-');
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          bookingDate = `${day} ${monthNames[parseInt(month) - 1]}`;
+          bookingTime = firstReservation.timeSlot;
+        }
+
         return {
           id: user.id,
           name: user.name,
@@ -168,11 +175,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
           mobile: user.mobile,
           email: user.email,
           status, // Map payment status to display status
-          packageType: user.packages[0]?.type || 'single',
+          packageType: user.packages[0]?.type || user.packageType || 'single',
           totalSessions: user.totalSessions,
           usedSessions: user.usedSessions,
           remainingSessions: user.remainingSessions,
           packages: user.packages,
+          bookingDate,
+          bookingTime,
         };
       });
 
@@ -504,49 +513,6 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       console.error('Error updating booking status:', error);
       // Revert the change if network error
       fetchBookings();
-    }
-  };
-
-  const handleSendCode = async (user: User) => {
-    // Resend activation code to user
-    setIsSendingEmail(true);
-
-    try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/resend-activation-code`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`,
-        },
-        body: JSON.stringify({
-          email: user.email,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to resend activation code:', errorText);
-
-        try {
-          const errorData = JSON.parse(errorText);
-          alert(errorData.error || 'Failed to resend activation code. Please try again.');
-        } catch {
-          alert('Failed to resend activation code. The user may not have any active codes.');
-        }
-
-        setIsSendingEmail(false);
-        return;
-      }
-
-      const data = await response.json();
-      console.log('Activation code resent successfully:', data);
-
-      alert(`Activation code resent to ${user.email}`);
-      setIsSendingEmail(false);
-    } catch (error) {
-      console.error('Error resending activation code:', error);
-      alert('Network error. Please check your connection.');
-      setIsSendingEmail(false);
     }
   };
 
@@ -1064,7 +1030,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                                 {user.packageType === 'package8' && '8 Sessions (3500 DEN)'}
                                 {user.packageType === 'package10' && '10 Sessions (4200 DEN)'}
                                 {user.packageType === 'package12' && '12 Sessions (4800 DEN)'}
-                                {user.packageType === 'single' && 'Single (500 DEN)'}
+                                {user.packageType === 'single' && 'Single (600 DEN)'}
                               </div>
                             </div>
 
@@ -1078,68 +1044,39 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                               </div>
                             )}
 
-                            {/* Code Sent Time */}
-                            {user.codeSentAt && (
-                              <div className="mb-3 p-3 bg-white rounded-md">
-                                <p className="text-xs text-[#8b7764] mb-1">Code Sent:</p>
-                                <p className="text-sm text-[#3d2f28]">
-                                  {new Date(user.codeSentAt).toLocaleString()}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Sessions Remaining (for confirmed users with packages) */}
+                            {/* Sessions Usage (for confirmed users with packages) */}
                             {user.status === 'confirmed' && user.packageType !== 'single' && (
                               <div className="mb-3 p-3 bg-white rounded-md">
                                 <p className="text-xs text-[#8b7764] mb-1">Package Usage:</p>
                                 <div className="flex items-center justify-between">
                                   <p className="text-sm text-[#3d2f28]">
-                                    <span className="font-medium text-green-700">{remainingSessions}</span> / {sessionCount} sessions remaining
+                                    Used <span className="font-medium text-[#6b5949]">{usedSessions}</span> of {sessionCount}
                                   </p>
-                                  <div className="text-xs text-[#8b7764]">
-                                    Used: {usedSessions}
+                                  <div className="text-xs text-green-600 font-medium">
+                                    {remainingSessions} remaining
                                   </div>
                                 </div>
-                                {/* Progress Bar */}
-                                <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                {/* Progress Bar - dark = used, light = remaining */}
+                                <div className="mt-2 h-2 bg-[#e8e6e3] rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-green-500 transition-all"
-                                    style={{ width: `${((sessionCount - remainingSessions) / sessionCount) * 100}%` }}
+                                    className="h-full bg-[#6b5949] transition-all"
+                                    style={{ width: `${(usedSessions / sessionCount) * 100}%` }}
                                   />
                                 </div>
                               </div>
                             )}
 
-                            {/* Code + Action */}
+                            {/* Action Buttons */}
                             <div className="flex flex-wrap items-center gap-2">
-                              {user.packageType !== 'single' && user.activationCode && (
-                                <div className="px-3 py-1.5 bg-white rounded-md text-sm text-[#6b5949]">
-                                  <span className="text-[#8b7764]">Code: </span>
-                                  <span className="font-mono font-medium text-[#3d2f28]">
-                                    {user.activationCode}
-                                  </span>
-                                </div>
-                              )}
-
                               {user.status === 'pending' && user.packageType !== 'single' ? (
-                                <>
-                                  <button
-                                    onClick={() => handleActivatePackage(user)}
-                                    disabled={isProcessing}
-                                    className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                                  >
-                                    <CheckCircle className="w-3 h-3" />
-                                    AKTIVIZO
-                                  </button>
-                                  <button
-                                    onClick={() => handleSendCode(user)}
-                                    disabled={isSendingEmail}
-                                    className="px-3 py-1.5 bg-[#6b5949] text-white rounded-md text-xs font-medium hover:bg-[#5a4838] transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                                  >
-                                    <Mail className="w-3 h-3" />
-                                    Resend Code
-                                  </button>
-                                </>
+                                <button
+                                  onClick={() => handleActivatePackage(user)}
+                                  disabled={isProcessing}
+                                  className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                  <CheckCircle className="w-3 h-3" />
+                                  AKTIVIZO
+                                </button>
                               ) : user.status === 'confirmed' ? (
                                 <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-md text-xs font-medium flex items-center gap-1.5">
                                   <CheckCircle className="w-3 h-3" />
@@ -1371,159 +1308,6 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
           </div>
         ) : null}
       </div>
-
-      {/* Email Confirmation Modal */}
-      {showEmailModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b border-[#e8dfd8]">
-              <h3 className="text-base text-[#3d2f28]">Send Activation Code</h3>
-              <button
-                onClick={() => {
-                  setShowEmailModal(false);
-                  setEmailStatus(null);
-                }}
-                className="p-1 hover:bg-[#f5f0ed] rounded-lg transition-colors"
-                disabled={isSendingEmail}
-              >
-                <X className="w-5 h-5 text-[#6b5949]" />
-              </button>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-[#6b5949] mb-3">
-                Send activation code to:
-              </p>
-              <div className="bg-[#f5f0ed] rounded-lg p-3 mb-4">
-                <p className="text-sm text-[#3d2f28]">
-                  {selectedUser.name} {selectedUser.surname}
-                </p>
-                <p className="text-xs text-[#8b7764] mt-1">{selectedUser.email}</p>
-              </div>
-
-              {/* Package Selection */}
-              <div className="mb-4">
-                <label className="block text-sm text-[#6b5949] mb-2">
-                  {selectedUser.packageType === 'single' ? 'Send Activation Code For:' : 'Booked Package:'}
-                </label>
-                
-                {/* Show only the booked package */}
-                {selectedUser.packageType === 'package8' && (
-                  <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">8 Sessions</p>
-                        <p className="text-xs text-[#8b7764]">Code: PILATES8</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-[#3d2f28]">3500 DEN</p>
-                        <p className="text-xs text-[#9ca571] font-medium">Recommended</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedUser.packageType === 'package8' && (
-                  <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">8 Sessions</p>
-                        <p className="text-xs text-[#8b7764]">Code: WELLNEST8</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-[#3d2f28]">3500 DEN</p>
-                        <p className="text-xs text-[#9ca571] font-medium">Basic</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedUser.packageType === 'package10' && (
-                  <div className="w-full p-3 rounded-lg border-2 border-[#9ca571] bg-[#f8f9f0] text-left">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">10 Sessions</p>
-                        <p className="text-xs text-[#8b7764]">Code: WELLNEST10</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-[#3d2f28]">4200 DEN</p>
-                        <p className="text-xs text-[#9ca571] font-medium">Recommended</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedUser.packageType === 'package12' && (
-                  <div className="w-full p-3 rounded-lg border-2 border-[#6b5949] bg-[#f5f0ed] text-left">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">12 Sessions</p>
-                        <p className="text-xs text-[#8b7764]">Code: PILATES12</p>
-                      </div>
-                      <p className="text-sm text-[#3d2f28]">4800 DEN</p>
-                    </div>
-                  </div>
-                )}
-
-                {selectedUser.packageType === 'single' && (
-                  <div className="w-full p-3 rounded-lg border-2 border-[#e8dfd8] bg-[#f5f0ed] text-left">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-[#3d2f28] font-medium">Single Session</p>
-                        <p className="text-xs text-[#8b7764]">One-time booking - No package selected</p>
-                      </div>
-                      <p className="text-sm text-[#3d2f28]">600 DEN</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Status Message */}
-              {emailStatus && (
-                <div
-                  className={`mb-4 px-4 py-3 rounded-lg text-sm ${
-                    emailStatus.type === 'success' 
-                      ? 'bg-green-100 text-green-700 border border-green-200' 
-                      : 'bg-red-100 text-red-700 border border-red-200'
-                  }`}
-                >
-                  {emailStatus.message}
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowEmailModal(false);
-                    setEmailStatus(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-[#f5f0ed] text-[#6b5949] rounded-lg text-sm hover:bg-[#e8dfd8] transition-colors disabled:opacity-50"
-                  disabled={isSendingEmail}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSendCode}
-                  className="flex-1 px-4 py-2 bg-[#6b5949] text-white rounded-lg text-sm hover:bg-[#5a4838] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  disabled={isSendingEmail}
-                >
-                  {isSendingEmail ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4" />
-                      Send Email
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Dev Tools Modal */}
       {showDevTools && (

@@ -11,7 +11,6 @@ export type BookingData = {
   date?: string;
   dateKey?: string;
   timeSlot?: string;
-  instructor?: string;
   selectedPackage?: string;
   payInStudio?: boolean;
 };

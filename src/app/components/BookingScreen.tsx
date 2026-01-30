@@ -10,7 +10,6 @@ type BookingScreenProps = {
   trainingType?: 'single' | 'package' | 'individual';
   onBack: () => void;
   onSubmit: (bookingData: any) => void;
-  onInstructorClick: (instructorName: string) => void;
   language: Language;
   refreshKey?: number;
 };
@@ -86,7 +85,7 @@ const generateWeekdayDates = (language: Language) => {
   return dates;
 };
 
-export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClick, language, refreshKey }: BookingScreenProps) {
+export function BookingScreen({ trainingType, onBack, onSubmit, language, refreshKey }: BookingScreenProps) {
   const t = translations[language];
   const [currentTime, setCurrentTime] = useState<Date>(getSkopjeTime());
   const [allBookings, setAllBookings] = useState<any[]>([]);
@@ -319,8 +318,7 @@ export function BookingScreen({ trainingType, onBack, onSubmit, onInstructorClic
                     onSubmit({
                       timeSlot: slot.time,
                       date: tabs[selectedTab].date,
-                      dateKey: tabs[selectedTab].key,
-                      instructor: 'Rina Krasniqi'
+                      dateKey: tabs[selectedTab].key
                     });
                   }
                 }}

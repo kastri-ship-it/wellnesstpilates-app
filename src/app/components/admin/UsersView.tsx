@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Search, Filter, ChevronDown, ChevronUp, Mail, Gift, Ban, CheckCircle,
-  Phone, Calendar, Package, User, X, Clock
+  Phone, Calendar, Package, User, X, Clock, UserCheck
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
@@ -193,6 +193,45 @@ export function UsersView() {
       }
     } catch (error) {
       console.error('Error toggling block:', error);
+    }
+  };
+
+  const handleActivateUser = async (user: UserData) => {
+    if (!confirm(`Activate ${user.name} ${user.surname}?\n\nThis will:\n• Generate login credentials\n• Send credentials via email\n• Mark as PAID`)) {
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-b87b0c07/admin/activate-package`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({ email: user.email }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.alreadyActivated) {
+          alert('User was already activated.');
+        } else {
+          alert(`✅ User activated!\n\nCredentials sent to: ${user.email}`);
+        }
+        await fetchUsers();
+      } else {
+        alert(data.error || 'Failed to activate user');
+      }
+    } catch (error) {
+      console.error('Error activating user:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -407,13 +446,15 @@ export function UsersView() {
                             {getPackageLabel(user.packages[0]?.type || user.packageType || 'single')}
                           </p>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="text-sm text-[#8b7764]">Sessions remaining</span>
-                            <span className="font-bold text-[#6b5949]">
-                              {user.remainingSessions} / {user.totalSessions}
+                            <span className="text-sm text-[#8b7764]">
+                              Used <span className="font-medium text-[#6b5949]">{user.totalSessions - user.remainingSessions}</span> of {user.totalSessions}
+                            </span>
+                            <span className="text-sm text-green-600 font-medium">
+                              {user.remainingSessions} left
                             </span>
                           </div>
                           {user.totalSessions > 0 && (
-                            <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="mt-2 h-2 bg-[#e8e6e3] rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-[#6b5949] transition-all"
                                 style={{
@@ -467,6 +508,18 @@ export function UsersView() {
 
                     {/* Action Buttons */}
                     <div className="flex gap-2">
+                      {/* Activate Button - only show for PENDING users */}
+                      {user.paymentStatus !== 'paid' && (
+                        <button
+                          onClick={() => handleActivateUser(user)}
+                          disabled={isProcessing}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                          Activate
+                        </button>
+                      )}
+
                       <button
                         onClick={() => {
                           setSelectedUser(user);

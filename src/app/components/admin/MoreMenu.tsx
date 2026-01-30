@@ -72,7 +72,7 @@ export function MoreMenu({ onClose, onLogout }: MoreMenuProps) {
             <h3 className="font-medium text-[#3d2f28] mb-4">Package Types</h3>
             <div className="space-y-2">
               {[
-                { name: 'Single Session', price: '500 DEN', sessions: 1 },
+                { name: 'Single Session', price: '600 DEN', sessions: 1 },
                 { name: '8 Classes Package', price: '3,500 DEN', sessions: 8 },
                 { name: '10 Classes Package', price: '4,200 DEN', sessions: 10 },
                 { name: '12 Classes Package', price: '4,800 DEN', sessions: 12 },
